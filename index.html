@@ -1468,10 +1468,9 @@ const App = {
   setPin(v){ ST.pinError=""; ST.pinInput=v; },
   togglePinShow(){ ST.pinShow=!ST.pinShow; render(); setTimeout(()=>document.getElementById("pinField")?.focus(),0); },
   async tryLogin(){
-    if(!isFirebaseConfigured()){
-      // وضع احتياطي محلي فقط (لم تُضف بيانات Firebase بعد)
-      if(ST.pinInput===PASSWORD){ ST.screen="admin"; ST.adminPage="dashboard"; ST.pinError=""; checkAutoBackup(); render(); }
-      else { ST.pinError="كلمة السر غير صحيحة"; render(); }
+    if(!isFirebaseConfigured() || !fbAuth){
+      ST.pinError="تعذر الاتصال بـ Firebase. النسخة المنشورة قديمة؛ حدّث ملفات GitHub Pages.";
+      render();
       return;
     }
     const email = (ST.emailInput||"").trim();
