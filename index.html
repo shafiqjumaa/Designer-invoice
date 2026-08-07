@@ -49,7 +49,14 @@ label.lbl{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
 .btn-icon{padding:9px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;}
 .chip{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);color:var(--text);background:var(--panel2);margin:3px;}
 .chip.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:var(--accent2);color:#fff;}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--border);}
+.page-header .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.empty-state{text-align:center;padding:48px 20px;border:1px dashed var(--border);border-radius:var(--radius);background:var(--panel2);}
+.empty-state .icon-box{width:52px;height:52px;background:var(--panel);color:var(--muted);margin:0 auto 14px;border:1px solid var(--border);}
+.empty-state p{margin:0 0 4px;color:var(--muted);font-size:13px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);transition:border-color .15s;}
+.card.hoverable:hover{border-color:var(--accent2);}
+.navbtn.active{box-shadow:0 4px 14px rgba(99,102,241,.3);}
 .grid{display:grid;gap:14px;}
 .g2{grid-template-columns:repeat(2,1fr);} .g3{grid-template-columns:repeat(3,1fr);} .g4{grid-template-columns:repeat(4,1fr);} .g5{grid-template-columns:repeat(5,1fr);}
 @media(max-width:700px){.g2,.g3,.g4,.g5{grid-template-columns:repeat(2,1fr);}}
@@ -57,12 +64,13 @@ label.lbl{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
 .muted{color:var(--muted);} .small{font-size:12px;} .bold{font-weight:bold;}
 .badge{font-size:11px;padding:4px 11px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
 .badge-green{background:var(--greenBg);color:var(--green);} .badge-amber{background:var(--amberBg);color:var(--amber);} .badge-grey{background:var(--panel2);color:var(--muted);border:1px solid var(--border);} .badge-rose{background:var(--roseBg);color:var(--rose);}
-#syncBadge.st-online{background:var(--greenBg);color:var(--green);}
-#syncBadge.st-syncing{background:var(--amberBg);color:var(--amber);}
-#syncBadge.st-offline{background:var(--roseBg);color:var(--rose);}
-.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+#sidebarSyncStatus{display:flex;align-items:center;gap:7px;font-size:11px;padding:7px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);color:var(--text);margin-top:8px;}
+#sidebarSyncStatus.st-syncing .sync-dot{background:var(--amber);}
+#sidebarSyncStatus.st-offline .sync-dot{background:var(--rose);}
+#sidebarSyncStatus.st-online .sync-dot{background:var(--green);}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;box-shadow:0 0 0 3px transparent;}
 .sync-dot.spin{animation:syncspin 1s linear infinite;}
-@keyframes syncspin{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}
+@keyframes syncspin{0%{opacity:.35}50%{opacity:1}100%{opacity:.35}}
 .icon-box{display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0;}
 .progress-track{height:10px;border-radius:6px;background:var(--panel2);overflow:hidden;}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .3s;}
@@ -84,6 +92,7 @@ label.lbl{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
 .navbtn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
 .nav-badge{position:absolute;left:8px;top:8px;background:var(--rose);color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
 .main{flex:1;padding:24px;overflow-y:auto;max-height:100vh;}
+.main-inner{max-width:1180px;margin:0 auto;}
 .page-title{font-size:23px;font-weight:bold;margin-bottom:18px;}
 .fab{position:fixed;bottom:24px;left:24px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(99,102,241,.45);z-index:30;}
 .theme-fab{position:fixed;top:16px;left:16px;width:42px;height:42px;border-radius:50%;background:var(--panel);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:200;}
@@ -142,7 +151,6 @@ details summary::-webkit-details-marker{display:none;}
 </head>
 <body>
 <button id="themeToggleBtn" class="theme-fab" onclick="App.toggleTheme()" title="تبديل المظهر"></button>
-<div id="syncBadge" class="hidden" style="position:fixed;top:16px;right:16px;z-index:200;font-size:11px;padding:6px 12px;border-radius:20px;display:flex;align-items:center;gap:6px;box-shadow:var(--shadow);"></div>
 <div id="app"></div>
 <div id="modalRoot"></div>
 <input type="file" id="importFileInput" accept=".json" style="display:none">
@@ -357,13 +365,17 @@ function authErrorMessage(err){
   };
   return map[code] || ("حدث خطأ: " + (err && err.message ? err.message : "غير معروف"));
 }
+let syncState = "local"; // local | online | syncing | offline
 function setSyncState(state){
-  const el = document.getElementById("syncBadge"); if(!el) return;
-  el.classList.remove("hidden","st-online","st-syncing","st-offline");
-  if(!currentUser){ el.classList.add("hidden"); return; }
-  if(state==="syncing"){ el.classList.add("st-syncing"); el.innerHTML = `<span class="sync-dot spin"></span> جارِ الحفظ...`; }
-  else if(state==="offline"){ el.classList.add("st-offline"); el.innerHTML = `<span class="sync-dot"></span> غير متصل — سيُحفظ عند رجوع الإنترنت`; }
-  else { el.classList.add("st-online"); el.innerHTML = `<span class="sync-dot"></span> متصل ومتزامن`; }
+  syncState = state;
+  const el = document.getElementById("sidebarSyncStatus");
+  if(el){ el.outerHTML = sidebarSyncStatusHtml(); } // تحديث فوري بدون إعادة رسم كل الصفحة (لا يقاطع أي تعديل نشط)
+}
+function sidebarSyncStatusHtml(){
+  if(!currentUser) return `<div id="sidebarSyncStatus"><span class="sync-dot" style="background:var(--muted);"></span> وضع محلي (بدون سحابة)</div>`;
+  if(syncState==="syncing") return `<div id="sidebarSyncStatus" class="st-syncing"><span class="sync-dot spin"></span> جارِ الحفظ...</div>`;
+  if(syncState==="offline") return `<div id="sidebarSyncStatus" class="st-offline"><span class="sync-dot"></span> غير متصل — سيُحفظ عند رجوع الإنترنت</div>`;
+  return `<div id="sidebarSyncStatus" class="st-online"><span class="sync-dot"></span> متصل ومتزامن</div>`;
 }
 function updateSyncBadge(){ setSyncState(navigator.onLine? "online":"offline"); }
 window.addEventListener("online", ()=>{ setSyncState("online"); if(currentUser) pushDBToCloud(); });
@@ -642,7 +654,7 @@ function renderAdmin(){
     <aside class="sidebar">
       <div style="margin-bottom:14px;">
         <div class="bold">لوحة المصمم</div>
-        <div class="muted small brand-sub flex gap center" style="gap:4px;">${icon('lock',11)} محمية بكلمة سر</div>
+        ${sidebarSyncStatusHtml()}
       </div>
       <div class="navlist">
         ${navBtn("dashboard","home","الرئيسية")}
@@ -663,8 +675,10 @@ function renderAdmin(){
       </div>
     </aside>
     <main class="main">
+      <div class="main-inner">
       ${backupBanner()}
       ${renderAdminPage(stats)}
+      </div>
     </main>
   </div>`;
 }
@@ -707,6 +721,13 @@ function pageDashboard(stats){
   <div>${recentBatches.length===0? `<p class="muted small">لا يوجد أعمال بعد.</p>` : recentBatches.map(b=>{const total=(b.items||[]).reduce((s,it)=>s+itemTotal(it),0);return `<div class="card" style="margin-bottom:8px;padding:12px 16px;display:flex;justify-content:space-between;"><span class="small">${esc(b.title)} — ${esc(clientName(b.clientId))}</span><span class="muted small">$${fmt(total)}</span></div>`;}).join("")}</div>
   `;
 }
+function emptyState(iconName, text, ctaLabel, ctaOnclick){
+  return `<div class="empty-state">
+    <div class="icon-box" style="margin:0 auto 14px;">${icon(iconName,24)}</div>
+    <p>${esc(text)}</p>
+    ${ctaLabel? `<button class="btn btn-primary small" style="margin-top:10px;" onclick="${ctaOnclick}">${icon('plus',14)} ${esc(ctaLabel)}</button>`:""}
+  </div>`;
+}
 function statCard(iconName,label,value,bg,color){
   return `<div class="card"><div class="icon-box" style="width:40px;height:40px;background:${bg};color:${color};margin-bottom:10px;">${icon(iconName,20)}</div><div style="font-size:21px;font-weight:bold;">${value}</div><div class="muted small" style="margin-top:4px;">${label}</div></div>`;
 }
@@ -715,11 +736,11 @@ function statCard(iconName,label,value,bg,color){
 function pageDesignWorks(){
   const list = DB.batches.slice().reverse();
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:12px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">أعمال التصميم</h1>
     <button class="btn btn-primary" onclick="App.openBatchMetaModal()">${icon('plus',16)} مجموعة عمل جديدة</button>
   </div>
-  ${list.length===0? `<p class="muted small">لا يوجد أعمال تصميم بعد.</p>` :
+  ${list.length===0? emptyState("palette","لا يوجد أعمال تصميم بعد.","إضافة مجموعة عمل","App.openBatchMetaModal()") :
   list.map(b=>{
     const total = (b.items||[]).reduce((s,it)=>s+itemTotal(it),0);
     const real = (b.items||[]).reduce((s,it)=>s+itemRealTotal(it),0);
@@ -748,12 +769,12 @@ function pageBatchDetail(){
   const profitVal = total-real;
   return `
   <button class="btn btn-soft small" onclick="App.backToWorks()" style="margin-bottom:14px;">${icon('chevronLeft',14)} رجوع لأعمال التصميم</button>
-  <div class="flex between wrap" style="margin-bottom:18px;gap:10px;">
+  <div class="page-header">
     <div>
       <h1 class="page-title" style="margin-bottom:4px;">${esc(b.title)} <span class="badge ${b.status==='مفتوح'?'badge-green':'badge-grey'}">${esc(b.status)}</span></h1>
       <p class="muted small">العميل: ${esc(clientName(b.clientId))} · ${esc(b.startDate||"")}${b.endDate?" → "+esc(b.endDate):""}</p>
     </div>
-    <div class="flex gap">
+    <div class="actions">
       <button class="btn btn-success small" onclick="App.invoiceFromBatch('${b.id}')">${icon('receipt',14)} فاتورة</button>
       <button class="btn btn-soft small" onclick="App.openBatchMetaModal('${b.id}')">${icon('edit',14)} تعديل</button>
       <button class="btn btn-danger small" onclick="App.deleteBatch('${b.id}')">${icon('trash',14)} حذف</button>
@@ -766,7 +787,7 @@ function pageBatchDetail(){
     ${statCard("trendUp","الربح (مقابل القيمة الحقيقية)","$"+fmt(profitVal),profitVal>=0?"var(--greenBg)":"var(--roseBg)",profitVal>=0?"var(--green)":"var(--rose)")}
   </div>
   <h2 class="small bold muted" style="margin-bottom:10px;">قائمة الأعمال</h2>
-  ${(b.items||[]).length===0? `<p class="muted small">لا يوجد أعمال مضافة بعد.</p>` :
+  ${(b.items||[]).length===0? emptyState("clipboard","لا يوجد أعمال مضافة بعد. اضغط + بالأسفل لإضافة أول عمل.") :
   b.items.map((it,idx)=>{
     const t = itemTotal(it); const diff = t-itemRealTotal(it);
     const detailed = it.pricingMode==="detailed";
@@ -799,11 +820,11 @@ function pageBatchDetail(){
 function pageSubscriptions(){
   const list = DB.subscriptions.slice().reverse();
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:10px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">الاشتراكات الشهرية</h1>
     <button class="btn btn-primary" onclick="App.openSubModal()">${icon('plus',16)} باقة جديدة</button>
   </div>
-  ${list.length===0? `<p class="muted small">لا يوجد اشتراكات بعد. مناسبة للعملاء الدائمين (باقات شهرية متكررة).</p>` :
+  ${list.length===0? emptyState("package","لا يوجد اشتراكات بعد. مناسبة للعملاء الدائمين (باقات شهرية متكررة).","باقة جديدة","App.openSubModal()") :
   list.map(s=>{
     const days = s.renewalDate? Math.ceil((new Date(s.renewalDate)-new Date())/86400000) : null;
     const soon = days!==null && days<=7 && s.status==="نشط";
@@ -829,11 +850,11 @@ function pageInvoices(){
   const list = DB.invoices.slice().reverse();
   const statusBadge = {"مسودة":"badge-grey","مرسلة":"badge-amber","مدفوعة":"badge-green"};
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:10px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">الفواتير</h1>
     <button class="btn btn-primary" onclick="App.openInvoiceModal()">${icon('plus',16)} فاتورة جديدة</button>
   </div>
-  ${list.length===0? `<p class="muted small">لا يوجد فواتير بعد.</p>` :
+  ${list.length===0? emptyState("receipt","لا يوجد فواتير بعد.","فاتورة جديدة","App.openInvoiceModal()") :
   list.map(inv=>{
     const total = (inv.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.price||0),0);
     return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -855,14 +876,14 @@ function pageContracts(){
   const list = DB.contracts.slice().reverse();
   const statusBadge = {"مسودة":"badge-grey","بانتظار التوقيع":"badge-amber","موقع":"badge-green"};
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:10px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">العقود</h1>
     <button class="btn btn-primary" onclick="App.openContractModal()">${icon('plus',16)} عقد جديد</button>
   </div>
   <div class="card" style="background:var(--amberBg);border-color:var(--amber);margin-bottom:18px;">
     <p class="small" style="margin:0;">${icon('bell',13)} توقيع العميل عن بعد يتم بهذه الطريقة: تصدّر للعميل ملف توقيع مستقل، يوقّعه ويصدّر صورة، يرسلها لك، وترفقها هنا بزر "إرفاق نسخة موقعة". لا يوجد مزامنة تلقائية بدون استضافة حقيقية.</p>
   </div>
-  ${list.length===0? `<p class="muted small">لا يوجد عقود بعد.</p>` :
+  ${list.length===0? emptyState("document","لا يوجد عقود بعد.","عقد جديد","App.openContractModal()") :
   list.map(c=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div><div class="bold small">${esc(c.number)} — ${esc(clientName(c.clientId))}</div><div class="muted small">${esc(c.projectType)} · $${fmt(c.price)} · ${esc(c.duration||"")}</div></div>
       <div class="flex gap center">
@@ -882,7 +903,7 @@ function pageExpenses(){
   const byCat = {};
   DB.expenses.forEach(e=>{ byCat[e.category]=(byCat[e.category]||0)+Number(e.amount||0); });
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:10px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">المصاريف</h1>
     <button class="btn btn-primary" onclick="App.openExpenseModal()">${icon('plus',16)} مصروف جديد</button>
   </div>
@@ -890,7 +911,7 @@ function pageExpenses(){
     ${statCard("wallet","إجمالي المصاريف","$"+fmt(total),"var(--roseBg)","var(--rose)")}
     ${EXPENSE_CATEGORIES.slice(0,3).map(cat=>statCard("dollar",cat,"$"+fmt(byCat[cat]||0),"var(--panel2)","var(--muted)")).join("")}
   </div>
-  ${list.length===0? `<p class="muted small">لا يوجد مصاريف مسجلة بعد.</p>` :
+  ${list.length===0? emptyState("wallet","لا يوجد مصاريف مسجلة بعد.","مصروف جديد","App.openExpenseModal()") :
   list.map(e=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div><div class="bold small">${esc(e.name)} <span class="badge badge-grey">${esc(e.category)}</span></div><div class="muted small">${esc(e.date)} ${e.notes?(" · "+esc(e.notes)):""}</div></div>
       <div class="flex gap center"><span class="bold" style="color:var(--rose);">-$${fmt(e.amount)}</span>
@@ -904,7 +925,7 @@ function pageExpenses(){
 /* ---------- WAITLIST + CALENDAR ---------- */
 function pageWaitlist(){
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:10px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">قائمة الانتظار والاجتماعات</h1>
     <button class="btn btn-primary" onclick="App.openWaitModal()">${icon('plus',16)} إضافة للقائمة</button>
   </div>
@@ -964,7 +985,7 @@ function pageGoals(){
   });
   const pct = (a,t)=> t>0? Math.min(100, Math.round(a/t*100)) : 0;
   return `
-  <div class="flex between wrap" style="margin-bottom:20px;gap:10px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">أهدافي — ${key}</h1>
     <button class="btn btn-primary" onclick="App.openGoalsModal()">${icon('edit',16)} تعديل الأهداف</button>
   </div>
@@ -993,12 +1014,12 @@ function pageClients(){
   const lvlClass = {green:'badge-green',yellow:'badge-amber',red:'badge-rose'};
   const labels = {green:"عميل مربح",yellow:"متوسط",red:"يضيع وقتك"};
   return `
-  <div class="flex between" style="margin-bottom:20px;">
+  <div class="page-header">
     <h1 class="page-title" style="margin:0;">العملاء</h1>
     <button class="btn btn-primary" onclick="App.openClientModal()">${icon('userPlus',16)} عميل جديد</button>
   </div>
   <div>
-  ${DB.clients.length===0? `<p class="muted small">لا يوجد عملاء بعد.</p>` :
+  ${DB.clients.length===0? emptyState("users","لا يوجد عملاء بعد.","عميل جديد","App.openClientModal()") :
   DB.clients.map(c=>{
     const s = statFor(c.id);
     const isCompany = c.type==="company";
@@ -1030,7 +1051,7 @@ function pageResponses(){
   const list = DB.responses.slice().reverse();
   return `
   <h1 class="page-title">الردود الواردة</h1>
-  ${list.length===0? `<p class="muted small">لا يوجد ردود بعد.</p>` :
+  ${list.length===0? emptyState("inbox","لا يوجد ردود بعد. ستظهر هنا ردود العملاء عند تعبئة استمارة طلب مشروع.") :
   list.map(r=>{
     const est = Number(r.estimatedValue || budgetValue(r.budget) || 0);
     return `<details class="card" style="margin-bottom:10px;">
