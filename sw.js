@@ -1,7 +1,7 @@
 /* Service Worker بسيط: يخزّن ملفات الواجهة (index.html + الأيقونات) لتفتح
    حتى بدون إنترنت. بيانات التطبيق نفسها (العملاء/الفواتير...) تُدار بالكامل
    عبر Firestore الذي له نظام تخزين مؤقت ومزامنة خاص به منفصل عن هذا الملف. */
-const CACHE_NAME = "designerflow-shell-v1";
+const CACHE_NAME = "designerflow-shell-v2";
 const SHELL_FILES = [
   "./",
   "./index.html",
