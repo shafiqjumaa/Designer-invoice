@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>DesignerFlow | نظام إدارة أعمال المصمم</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#050914">
@@ -189,7 +189,7 @@ details summary::-webkit-details-marker{display:none;}
   .theme-fab{top:14px;left:14px;}
 }
 </style>
-<link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-neon-v1">
+<link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-mobile-v2">
 </head>
 <body>
 <div class="df-ambient" aria-hidden="true"><span class="glow glow-a"></span><span class="glow glow-b"></span><span class="glow glow-c"></span><span class="grid-layer"></span></div>
@@ -859,9 +859,9 @@ function renderAdmin(){
   const stats = calcStats();
   return `
   <div class="admin-layout">
-    <button type="button" class="mobile-menu-btn" onclick="App.toggleMobileNav()" aria-label="فتح القائمة">${icon("home",16)} القائمة</button>
+    <button type="button" class="mobile-menu-btn" onclick="App.toggleMobileNav()" aria-controls="designerSidebar" aria-expanded="false" aria-label="فتح القائمة">${icon("home",16)} القائمة</button>
     <button type="button" class="mobile-shade" onclick="App.toggleMobileNav()" aria-label="إغلاق القائمة"></button>
-    <aside class="sidebar">
+    <aside class="sidebar" id="designerSidebar">
       <div class="brand-header">
         <div class="brand-logo">${icon('palette',20)}</div>
         <div class="brand-text">
@@ -978,7 +978,7 @@ function pageDashboard(stats){
     <button class="btn btn-soft" onclick="App.exportBackup()">حفظ نسخة JSON</button>
     <button class="btn btn-primary" onclick="App.retryCloudConnection()">إعادة المحاولة</button>
   </div>`:""}
-  <div class="grid g4" style="margin-bottom:20px;">
+  <div class="grid g4 df-kpi-grid" style="margin-bottom:20px;">
     ${statCard("dollar","إيرادات الفواتير المدفوعة","$"+fmt(stats.profit),"var(--greenBg)","var(--green)")}
     ${statCard("clock","فواتير مرسلة غير مدفوعة","$"+fmt(stats.owed),"var(--amberBg)","var(--amber)")}
     ${statCard("wallet","صافي الإيرادات بعد المصاريف","$"+fmt(stats.netProfit),"var(--greenBg)","var(--accent2)")}
@@ -1067,7 +1067,7 @@ function pageBatchDetail(){
       <button class="btn btn-danger small" onclick="App.deleteBatch('${b.id}')">${icon('trash',14)} حذف</button>
     </div>
   </div>
-  <div class="grid g4" style="margin-bottom:20px;">
+  <div class="grid g4 df-kpi-grid" style="margin-bottom:20px;">
     ${statCard("dollar","إجمالي المشروع","$"+fmt(total),"var(--greenBg)","var(--green)")}
     ${statCard("check","المدفوع","$"+fmt(paid),"var(--greenBg)","var(--accent2)")}
     ${statCard("clock","المتبقي","$"+fmt(remaining),"var(--amberBg)","var(--amber)")}
@@ -1213,7 +1213,7 @@ function pageExpenses(){
     <h1 class="page-title" style="margin:0;">المصاريف</h1>
     <button class="btn btn-primary" onclick="App.openExpenseModal()">${icon('plus',16)} مصروف جديد</button>
   </div>
-  <div class="grid g4" style="margin-bottom:20px;">
+  <div class="grid g4 df-kpi-grid" style="margin-bottom:20px;">
     ${statCard("wallet","إجمالي المصاريف","$"+fmt(total),"var(--roseBg)","var(--rose)")}
     ${EXPENSE_CATEGORIES.slice(0,3).map(cat=>statCard("dollar",cat,"$"+fmt(byCat[cat]||0),"var(--panel2)","var(--muted)")).join("")}
   </div>
@@ -1485,7 +1485,7 @@ function modalItem(){
       ${it.type==='هوية بصرية'? `<div class="field"><label class="lbl">اقتراحات سريعة (اضغط للإضافة)</label><div>${IDENTITY_SUGGESTIONS.map(el=>`<button class="chip" onclick="App.addComponentSuggestion('${el.replace(/'/g,"\\'")}')">${icon('plus',11)} ${el}</button>`).join("")}</div></div>`:""}
       <div class="field">
         <div class="flex between" style="margin-bottom:8px;"><label class="lbl" style="margin:0;">بنود المشروع</label><button class="btn btn-soft small" onclick="App.addComponent()">${icon('plus',12)} بند مخصص</button></div>
-        <div class="grid" style="grid-template-columns:1.6fr 60px 90px 1fr 36px 36px;gap:6px;font-size:11px;color:var(--muted);margin-bottom:4px;">
+        <div class="grid df-comp-head" style="grid-template-columns:1.6fr 60px 90px 1fr 36px 36px;gap:6px;font-size:11px;color:var(--muted);margin-bottom:4px;">
           <span>الاسم</span><span>الكمية</span><span>السعر</span><span>الحالة</span><span></span><span></span>
         </div>
         <div id="componentsWrap">${componentsRowsHtml(it.components||[])}</div>
@@ -1790,7 +1790,9 @@ const App = {
     ST.screen="login"; ST.pinInput=""; ST.pinError="";
     try{ ST.emailInput = localStorage.getItem("designerAppLastEmail")||""; }catch(e){ ST.emailInput=""; }
     render();
-    setTimeout(()=>document.getElementById(isFirebaseConfigured()?"emailField":"pinField")?.focus(),50);
+    // Do not open a mobile keyboard before the user taps a field.
+    if(!window.matchMedia("(pointer: coarse)").matches)
+      setTimeout(()=>document.getElementById(isFirebaseConfigured()?"emailField":"pinField")?.focus(),50);
   },
   goClient(){ ST.screen="client"; ST.publicMode=false; ST.surveyDraft=emptySurvey(); ST.surveySubmitted=false; render(); },
   lock(){
@@ -1865,7 +1867,16 @@ const App = {
       alert("إذا كان البريد مسجلاً، تحقق من صندوق بريدك لاستعادة كلمة المرور.");
     }catch(e){alert(authErrorMessage(e));}
   },
-  toggleMobileNav(){document.body.classList.toggle("nav-open");},
+  toggleMobileNav(){
+    const opened=document.body.classList.toggle("nav-open");
+    const control=document.querySelector(".mobile-menu-btn");
+    if(control){
+      control.setAttribute("aria-expanded",String(opened));
+      control.setAttribute("aria-label",opened?"إغلاق القائمة":"فتح القائمة");
+    }
+    if(opened)document.querySelector("#designerSidebar .navbtn")?.focus({preventScroll:true});
+    else control?.focus({preventScroll:true});
+  },
   setAdminPage(p){ document.body.classList.remove("nav-open");ST.adminPage=p; ST.openBatchId=null; render(); },
   setWorkFilter(v){ ST.workFilter=v;render(); },
   setInvoiceFilter(v){ ST.invoiceFilter=v;render(); },
@@ -1896,7 +1907,13 @@ const App = {
   calNav(dir){ ST.calMonth += dir; if(ST.calMonth>11){ST.calMonth=0;ST.calYear++;} if(ST.calMonth<0){ST.calMonth=11;ST.calYear--;} render(); },
 
   // survey
-  surveySet(field, val){ ST.surveyDraft[field]=val; render(); },
+  surveySet(field,val){
+    ST.surveyDraft[field]=val;
+    // Do not recreate an active input after each keystroke on mobile.
+    const target=document.activeElement;
+    const isTyping=target&&(["INPUT","TEXTAREA"].includes(target.tagName)||target.isContentEditable);
+    if(field==="serviceType"||!isTyping)render();
+  },
   surveyToggleArr(field, val, max){ const arr=ST.surveyDraft[field]; if(arr.includes(val)) ST.surveyDraft[field]=arr.filter(x=>x!==val); else if(!max||arr.length<max) ST.surveyDraft[field]=[...arr,val]; render(); },
   submitSurvey(){
     const s=ST.surveyDraft;
