@@ -527,28 +527,40 @@ function itemPaidTotal(it){
 }
 function itemRealTotal(it){ return Number(it.realValue||0); }
 
+function invoiceTotal(inv){
+  return (inv.items||[]).reduce((sum,it)=>sum+Number(it.qty||0)*Number(it.price||0),0);
+}
+function nextDocumentNumber(records,prefix){
+  const re=new RegExp("^"+prefix+"-(\\d+)$");
+  const max=records.reduce((m,record)=>{
+    const match=String(record.number||"").match(re);
+    return match?Math.max(m,Number(match[1])):m;
+  },0);
+  return prefix+"-"+String(max+1).padStart(4,"0");
+}
 function calcStats(){
-  let profit=0, owed=0, active=0; const alerts=[];
-  DB.batches.forEach(b=>{
-    if(b.status==="مفتوح") active++;
-    (b.items||[]).forEach(it=>{ const t=itemTotal(it); const p=itemPaidTotal(it); profit+=p; owed+=(t-p); });
-  });
+  // Invoices are the single financial source of truth. Work orders and survey
+  // estimates are NOT cash receipts; counting both would double revenue.
+  let profit=0,owed=0,active=0;const alerts=[];
+  DB.batches.forEach(b=>{if(b.status==="مفتوح")active++;});
   DB.invoices.forEach(inv=>{
-    if(inv.status!=="مدفوعة" && inv.dueDate){
-      const days = Math.ceil((new Date(inv.dueDate)-new Date())/86400000);
-      if(days<=3){ const total=(inv.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.price||0),0); alerts.push({label:"فاتورة "+inv.number, client:inv.clientName||"بدون عميل", amount:total, days}); }
+    const amount=invoiceTotal(inv);
+    if(inv.status==="مدفوعة")profit+=amount;
+    if(inv.status==="مرسلة")owed+=amount;
+    if(inv.status==="مرسلة"&&inv.dueDate){
+      const days=Math.ceil((new Date(inv.dueDate+"T23:59:59")-new Date())/86400000);
+      if(days<=3)alerts.push({label:"فاتورة "+inv.number,client:inv.clientName||"بدون عميل",amount,days});
     }
   });
-  DB.subscriptions.forEach(s=>{
-    if(s.status==="نشط" && s.renewalDate){
-      const days = Math.ceil((new Date(s.renewalDate)-new Date())/86400000);
-      if(days<=7) alerts.push({label:"تجديد اشتراك "+s.name, client:clientName(s.clientId), amount:s.monthlyPrice, days});
+  DB.subscriptions.forEach(sub=>{
+    if(sub.status==="نشط"&&sub.renewalDate){
+      const days=Math.ceil((new Date(sub.renewalDate+"T23:59:59")-new Date())/86400000);
+      if(days<=7)alerts.push({label:"تجديد اشتراك "+sub.name,client:clientName(sub.clientId),amount:Number(sub.monthlyPrice)||0,days});
     }
   });
-  const pendingResponses = DB.responses.filter(r=>!r.converted).reduce((s,r)=>s+Number(r.estimatedValue||budgetValue(r.budget)||0),0);
-  owed += pendingResponses;
-  const totalExpenses = DB.expenses.reduce((s,e)=>s+Number(e.amount||0),0);
-  return {profit, owed, active, alerts, pendingResponses, totalExpenses, netProfit: profit-totalExpenses};
+  const pendingResponses=DB.responses.filter(r=>!r.converted).length;
+  const totalExpenses=DB.expenses.reduce((sum,e)=>sum+Number(e.amount||0),0);
+  return {profit,owed,active,alerts,pendingResponses,totalExpenses,netProfit:profit-totalExpenses};
 }
 
 function clientStats(){
@@ -761,6 +773,13 @@ function navBtn(page, iconName, label, badge){
   return `<button class="navbtn ${ST.adminPage===page?'active':''}" onclick="App.setAdminPage('${page}')">${icon(iconName,18)} <span class="navlabel">${label}</span>${badge?`<span class="nav-badge">${badge}</span>`:""}</button>`;
 }
 function renderAdminPage(stats){
+  if(ST.cloudError)return `<div class="empty-state">
+    ${icon("lock",28)}
+    <h2>توقف التحرير لحماية البيانات</h2>
+    <p>تعذّر التحقق من النسخة السحابية، لن نجازف باستبدال بيانات الأجهزة الأخرى.</p>
+    <button class="btn btn-soft" onclick="App.exportBackup()">تنزيل نسخة محلية</button>
+    <button class="btn btn-primary" onclick="App.retryCloudConnection()">إعادة الاتصال</button>
+  </div>`;
   const map = {dashboard:()=>pageDashboard(stats), work:()=> ST.openBatchId? pageBatchDetail() : pageDesignWorks(),
     subscriptions:pageSubscriptions, invoices:pageInvoices, contracts:pageContracts, expenses:pageExpenses,
     waitlist:pageWaitlist, goals:pageGoals, clients:pageClients, responses:pageResponses, settings:pageSettings};
@@ -773,13 +792,14 @@ function pageDashboard(stats){
   return `
   <h1 class="page-title">نظرة سريعة</h1>
   ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
-    <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للحساب. صدّر نسخة JSON قبل إعادة الاتصال حتى لا تضيع تعديلات لم تُرفع.</div></div>
-    <button class="btn btn-soft" onclick="App.retryCloudConnection()">إعادة المحاولة</button>
+    <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للعرض فقط. لا يمكن تعديل البيانات قبل إعادة الاتصال. يمكنك تنزيل نسخة JSON للحفظ.</div></div>
+    <button class="btn btn-soft" onclick="App.exportBackup()">حفظ نسخة JSON</button>
+    <button class="btn btn-primary" onclick="App.retryCloudConnection()">إعادة المحاولة</button>
   </div>`:""}
   <div class="grid g4" style="margin-bottom:20px;">
-    ${statCard("dollar","الربح المحصّل","$"+fmt(stats.profit),"var(--greenBg)","var(--green)")}
-    ${statCard("clock","مبالغ معلقة","$"+fmt(stats.owed),"var(--amberBg)","var(--amber)")}
-    ${statCard("wallet","صافي الربح الحقيقي (بعد المصاريف)","$"+fmt(stats.netProfit),"var(--greenBg)","var(--accent2)")}
+    ${statCard("dollar","إيرادات الفواتير المدفوعة","$"+fmt(stats.profit),"var(--greenBg)","var(--green)")}
+    ${statCard("clock","فواتير مرسلة غير مدفوعة","$"+fmt(stats.owed),"var(--amberBg)","var(--amber)")}
+    ${statCard("wallet","صافي الإيرادات بعد المصاريف","$"+fmt(stats.netProfit),"var(--greenBg)","var(--accent2)")}
     ${statCard("bell","تنبيهات", stats.alerts.length,"var(--roseBg)","var(--rose)")}
   </div>
   <h2 class="small bold muted" style="margin-bottom:10px;">تنبيهات قريبة</h2>
@@ -918,6 +938,7 @@ function pageSubscriptions(){
 /* ---------- INVOICES ---------- */
 function pageInvoices(){
   const list = DB.invoices.slice().reverse();
+  const numberCounts=DB.invoices.reduce((out,inv)=>{out[inv.number]=(out[inv.number]||0)+1;return out;},{});
   const statusBadge = {"مسودة":"badge-grey","مرسلة":"badge-amber","مدفوعة":"badge-green"};
   return `
   <div class="page-header">
@@ -931,6 +952,7 @@ function pageInvoices(){
       <div><div class="bold small">${esc(inv.number)} — ${esc(inv.clientName||"بدون عميل")}</div><div class="muted small">${esc(inv.date)} · $${fmt(total)}</div></div>
       <div class="flex gap center">
         <span class="badge ${statusBadge[inv.status]||'badge-grey'}">${esc(inv.status)}</span>
+        ${numberCounts[inv.number]>1?'<span class="badge badge-rose" title="فواتير قديمة لها الرقم نفسه. لم تتغير بياناتها.">رقم مكرر</span>':""}
         <button class="btn-icon btn-soft" title="تعديل" onclick="App.openInvoiceModal('${inv.id}')">${icon('edit',14)}</button>
         <button class="btn-icon btn-soft" title="عرض/طباعة" onclick="App.viewInvoice('${inv.id}')">${icon('eye',14)}</button>
         <button class="btn-icon btn-success" title="نسخ رابط للعميل" onclick="App.shareInvoiceLink('${inv.id}')">${icon('link',14)}</button>
@@ -1760,7 +1782,7 @@ const App = {
   saveGoals(){ const d=ST.modal.data; DB.goals[d._key]={income:Number(d.income||0), projects:Number(d.projects||0), clients:Number(d.clients||0)}; saveDB(); App.closeModal(); render(); },
 
   // CONTRACTS
-  nextContractNumber(){ return `CNT-${String(DB.contracts.length+1).padStart(4,"0")}`; },
+  nextContractNumber(){ return nextDocumentNumber(DB.contracts,"CNT"); },
   openContractModal(id){
     let data;
     if(id){ data=JSON.parse(JSON.stringify(DB.contracts.find(c=>c.id===id))); }
@@ -1773,6 +1795,8 @@ const App = {
     const d=ST.modal.data; if(!d.clientId) return alert("الرجاء اختيار عميل");
     const clean={...d, price:Number(d.price||0), revisions:Number(d.revisions||0)};
     const idx=DB.contracts.findIndex(c=>c.id===clean.id);
+    if((idx<0||DB.contracts[idx].number!==clean.number)&&DB.contracts.some(c=>c.id!==clean.id&&c.number===clean.number))
+      return alert("رقم العقد مستخدم سابقاً.");
     if(idx>=0) DB.contracts[idx]=clean; else DB.contracts.push(clean);
     saveDB(); App.closeModal(); render();
   },
@@ -1793,7 +1817,7 @@ const App = {
   },
 
   // INVOICES
-  nextInvoiceNumber(){ return `INV-${String(DB.invoices.length+1).padStart(4,"0")}`; },
+  nextInvoiceNumber(){ return nextDocumentNumber(DB.invoices,"INV"); },
   openInvoiceModal(id, prefill){
     let data;
     if(id){ data=JSON.parse(JSON.stringify(DB.invoices.find(i=>i.id===id))); }
@@ -1831,6 +1855,9 @@ const App = {
     const d=ST.modal.data;
     if(d.clientId){ d.clientName=clientName(d.clientId); if(!d.clientEmail) d.clientEmail=clientContact(d.clientId); }
     const idx=DB.invoices.findIndex(i=>i.id===d.id);
+    if(!/^INV-\d{4,}$/.test(String(d.number||"")))return alert("رقم الفاتورة يجب أن يكون مثل INV-0001.");
+    if((idx<0||DB.invoices[idx].number!==d.number)&&DB.invoices.some(i=>i.id!==d.id&&i.number===d.number))
+      return alert("رقم الفاتورة مستخدم سابقاً، اختر رقماً مختلفاً.");
     const clean={id:d.id, number:d.number, date:d.date, dueDate:d.dueDate, clientId:d.clientId, clientName:d.clientName, clientEmail:d.clientEmail, items:d.items, notes:d.notes, status:d.status, createdAt:d.createdAt||Date.now()};
     if(idx>=0) DB.invoices[idx]=clean; else DB.invoices.push(clean);
     saveDB(); App.closeModal(); render();
@@ -1946,15 +1973,32 @@ function buildStandaloneSignHtml(contract, businessName){
   "</" + S + "></body></html>";
 }
 
+function validateImportedDB(parsed){
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Error("صيغة غير صالحة");
+  const base=defaultDB(),out={};
+  for(const [key,defaultValue] of Object.entries(base)){
+    const value=Object.prototype.hasOwnProperty.call(parsed,key)?parsed[key]:defaultValue;
+    if(Array.isArray(defaultValue)){
+      if(!Array.isArray(value)||value.length>50000)throw Error("قائمة غير صالحة: "+key);
+      out[key]=value;
+    }else{
+      if(!value||typeof value!=="object"||Array.isArray(value))throw Error("إعدادات غير صالحة: "+key);
+      out[key]=value;
+    }
+  }
+  return out;
+}
 document.getElementById("importFileInput").addEventListener("change", function(e){
   const file=e.target.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=function(ev){
     try{
-      const parsed=JSON.parse(ev.target.result);
-      if(!confirm("سيتم استبدال جميع بياناتك الحالية. هل تريد الاستمرار؟")) return;
-      DB=Object.assign(defaultDB(), parsed); saveDB(); render(); alert("تم الاستيراد بنجاح");
-    }catch(err){ alert("ملف غير صالح."); }
+      const parsed=validateImportedDB(JSON.parse(ev.target.result));
+      const records=parsed.clients.length+parsed.batches.length+parsed.invoices.length;
+      if(!currentUser||!cloudReady)throw Error("سجّل الدخول وتحقق من الاتصال بالسحابة قبل الاستيراد");
+      if(!confirm("الملف يحوي "+records+" سجلاً من العملاء والأعمال والفواتير. سيتم استبدال بيانات حسابك الحالي بالكامل. صدّر نسخة حالية أولاً. هل تتابع؟"))return;
+      DB=parsed;saveDB();render();alert("تم استيراد البيانات محلياً. انتظر ظهور حالة الحفظ بالسحابة قبل إغلاق التطبيق.");
+    }catch(err){ alert("فشل الاستيراد: "+(err.message||"ملف غير صالح")); }
   };
   reader.readAsText(file); e.target.value="";
 });
