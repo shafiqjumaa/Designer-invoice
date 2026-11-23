@@ -609,8 +609,9 @@ function clientStats(){
 
 /* ===================== THEME ===================== */
 function initTheme(){
-  let t = "dark";
-  document.body.classList.toggle("light", t==="light");
+  let theme="dark";
+  try{theme=localStorage.getItem(THEME_KEY)||"dark";}catch(e){}
+  document.body.classList.toggle("light",theme==="light");
   updateThemeBtn();
 }
 function updateThemeBtn(){ document.getElementById("themeToggleBtn").innerHTML = icon(document.body.classList.contains("light")?"moon":"sun", 20); }
@@ -1632,7 +1633,11 @@ function modalGoals(){
 
 /* ===================== APP CONTROLLER ===================== */
 const App = {
-  toggleTheme(){ const isLight = document.body.classList.toggle("light"); updateThemeBtn(); },
+  toggleTheme(){
+    const isLight=document.body.classList.toggle("light");
+    try{localStorage.setItem(THEME_KEY,isLight?"light":"dark");}catch(e){}
+    updateThemeBtn();
+  },
   goLanding(){ ST.screen="landing"; ST.pinInput=""; ST.pinError=""; render(); },
   goLogin(){
     ST.screen="login"; ST.pinInput=""; ST.pinError="";
