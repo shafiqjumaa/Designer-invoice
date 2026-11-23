@@ -160,6 +160,27 @@ details summary::-webkit-details-marker{display:none;}
 .cal-cell{min-height:64px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);padding:6px;font-size:11px;position:relative;}
 .cal-cell.today{border-color:var(--accent2);}
 .cal-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin:1px;}
+.mobile-menu-btn,.mobile-shade{display:none;}
+@media(max-width:700px){
+  .mobile-menu-btn{display:inline-flex;position:fixed;right:14px;top:14px;z-index:101;padding:10px 13px;border-radius:12px;box-shadow:var(--shadow);background:var(--panel);color:var(--text);border:1px solid var(--border);align-items:center;gap:7px;}
+  .mobile-shade{position:fixed;inset:0;background:rgba(0,0,0,.56);z-index:98;border:none;}
+  .nav-open .mobile-shade{display:block;}
+  .sidebar{position:fixed;right:0;top:0;width:min(290px,85vw);height:100dvh;z-index:99;transform:translateX(103%);transition:transform .25s;overflow-y:auto;box-shadow:var(--shadow);}
+  .nav-open .sidebar{transform:translateX(0);}
+  .sidebar .navlabel,.brand-text{display:inline;}
+  .brand-header{justify-content:flex-start;}
+  .main{width:100%;padding:70px 14px 30px;max-height:none;overflow:visible;}
+  .main-inner{width:100%;}
+  .page-title{font-size:19px;}
+  .card{padding:14px;}
+  .modal-box{max-height:92dvh;padding:15px;}
+  .modal-overlay{padding:8px;}
+  .row-grid,.comp-grid{grid-template-columns:minmax(0,1fr);}
+  .invoice-paper{max-width:100%;}
+  .invoice-head,.invoice-body{padding:16px;}
+  .fab{bottom:14px;left:14px;}
+  .theme-fab{top:14px;left:14px;}
+}
 </style>
 </head>
 <body>
@@ -454,7 +475,8 @@ let ST = {
   pinInput: "", pinError: "", pinShow:false,
   calMonth: new Date().getMonth(), calYear: new Date().getFullYear(),
   signPad: null,
-  emailInput: "", authBusy: false, cloudError:false
+  emailInput: "", authBusy: false, cloudError:false,
+  workFilter:"all", invoiceFilter:"all"
 };
 
 function emptySurvey(){
@@ -716,6 +738,8 @@ function renderAdmin(){
   const stats = calcStats();
   return `
   <div class="admin-layout">
+    <button type="button" class="mobile-menu-btn" onclick="App.toggleMobileNav()" aria-label="فتح القائمة">${icon("home",16)} القائمة</button>
+    <button type="button" class="mobile-shade" onclick="App.toggleMobileNav()" aria-label="إغلاق القائمة"></button>
     <aside class="sidebar">
       <div class="brand-header">
         <div class="brand-logo">${icon('palette',20)}</div>
@@ -824,13 +848,16 @@ function statCard(iconName,label,value,bg,color){
 
 /* ---------- DESIGN WORKS ---------- */
 function pageDesignWorks(){
-  const list = DB.batches.slice().reverse();
+  const list = DB.batches.filter(b=>ST.workFilter==="all"||b.status===ST.workFilter).slice().reverse();
   return `
   <div class="page-header">
-    <h1 class="page-title" style="margin:0;">أعمال التصميم</h1>
+    <h1 class="page-title" style="margin:0;">المشاريع والأعمال</h1>
     <button class="btn btn-primary" onclick="App.openBatchMetaModal()">${icon('plus',16)} مجموعة عمل جديدة</button>
   </div>
-  ${list.length===0? emptyState("palette","لا يوجد أعمال تصميم بعد.","إضافة مجموعة عمل","App.openBatchMetaModal()") :
+  <div class="seg" style="margin-bottom:16px;">
+    ${[["all","الكل"],["مفتوح","قيد التنفيذ"],["منتهي","مكتمل"]].map(([val,label])=>`<button class="${ST.workFilter===val?"active":""}" onclick="App.setWorkFilter('${val}')">${label}</button>`).join("")}
+  </div>
+  ${list.length===0? emptyState("palette","لا يوجد أعمال تصميم بهذه الحالة.","إضافة مجموعة عمل","App.openBatchMetaModal()") :
   list.map(b=>{
     const total = (b.items||[]).reduce((s,it)=>s+itemTotal(it),0);
     const real = (b.items||[]).reduce((s,it)=>s+itemRealTotal(it),0);
@@ -937,7 +964,7 @@ function pageSubscriptions(){
 
 /* ---------- INVOICES ---------- */
 function pageInvoices(){
-  const list = DB.invoices.slice().reverse();
+  const list = DB.invoices.filter(inv=>ST.invoiceFilter==="all"||inv.status===ST.invoiceFilter).slice().reverse();
   const numberCounts=DB.invoices.reduce((out,inv)=>{out[inv.number]=(out[inv.number]||0)+1;return out;},{});
   const statusBadge = {"مسودة":"badge-grey","مرسلة":"badge-amber","مدفوعة":"badge-green"};
   return `
@@ -945,7 +972,10 @@ function pageInvoices(){
     <h1 class="page-title" style="margin:0;">الفواتير</h1>
     <button class="btn btn-primary" onclick="App.openInvoiceModal()">${icon('plus',16)} فاتورة جديدة</button>
   </div>
-  ${list.length===0? emptyState("receipt","لا يوجد فواتير بعد.","فاتورة جديدة","App.openInvoiceModal()") :
+  <div class="seg" style="margin-bottom:16px;">
+    ${[["all","الكل"],["مسودة","مسودة"],["مرسلة","مرسلة"],["مدفوعة","مدفوعة"]].map(([val,label])=>`<button class="${ST.invoiceFilter===val?"active":""}" onclick="App.setInvoiceFilter('${val}')">${label}</button>`).join("")}
+  </div>
+  ${list.length===0? emptyState("receipt","لا يوجد فواتير بهذه الحالة.","فاتورة جديدة","App.openInvoiceModal()") :
   list.map(inv=>{
     const total = (inv.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.price||0),0);
     return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -1636,7 +1666,10 @@ const App = {
       alert("إذا كان البريد مسجلاً، تحقق من صندوق بريدك لاستعادة كلمة المرور.");
     }catch(e){alert(authErrorMessage(e));}
   },
-  setAdminPage(p){ ST.adminPage=p; ST.openBatchId=null; render(); },
+  toggleMobileNav(){document.body.classList.toggle("nav-open");},
+  setAdminPage(p){ document.body.classList.remove("nav-open");ST.adminPage=p; ST.openBatchId=null; render(); },
+  setWorkFilter(v){ ST.workFilter=v;render(); },
+  setInvoiceFilter(v){ ST.invoiceFilter=v;render(); },
   openBatch(id){ ST.openBatchId=id; render(); },
   backToWorks(){ ST.openBatchId=null; render(); },
   calNav(dir){ ST.calMonth += dir; if(ST.calMonth>11){ST.calMonth=0;ST.calYear++;} if(ST.calMonth<0){ST.calMonth=11;ST.calYear--;} render(); },
