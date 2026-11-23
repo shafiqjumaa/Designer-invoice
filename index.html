@@ -367,7 +367,7 @@ function pushDBToCloud(){
 }
 async function loadCloudDBOnce(uid){
   const snaps=await Promise.all(CLOUD_KEYS.map(k=>
-    fbDB.collection("users").doc(uid).collection("appdata").doc(k).get()
+    fbDB.collection("users").doc(uid).collection("appdata").doc(k).get({source:"server"})
   ));
   const out=defaultDB();let found=false;
   snaps.forEach((snap,i)=>{
@@ -454,7 +454,7 @@ let ST = {
   pinInput: "", pinError: "", pinShow:false,
   calMonth: new Date().getMonth(), calYear: new Date().getFullYear(),
   signPad: null,
-  emailInput: "", authBusy: false
+  emailInput: "", authBusy: false, cloudError:false
 };
 
 function emptySurvey(){
@@ -772,6 +772,10 @@ function pageDashboard(stats){
   const recentBatches = DB.batches.slice(-5).reverse();
   return `
   <h1 class="page-title">نظرة سريعة</h1>
+  ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
+    <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للحساب. صدّر نسخة JSON قبل إعادة الاتصال حتى لا تضيع تعديلات لم تُرفع.</div></div>
+    <button class="btn btn-soft" onclick="App.retryCloudConnection()">إعادة المحاولة</button>
+  </div>`:""}
   <div class="grid g4" style="margin-bottom:20px;">
     ${statCard("dollar","الربح المحصّل","$"+fmt(stats.profit),"var(--greenBg)","var(--green)")}
     ${statCard("clock","مبالغ معلقة","$"+fmt(stats.owed),"var(--amberBg)","var(--amber)")}
@@ -1583,6 +1587,24 @@ const App = {
     try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
     catch(e){ST.pinError=authErrorMessage(e);ST.authBusy=false;render();}
   },
+  async retryCloudConnection(){
+    if(!fbAuth?.currentUser)return alert("سجّل الدخول أولاً.");
+    if(!navigator.onLine)return alert("تحقق من اتصال الإنترنت.");
+    if(!confirm("سيعاد تحميل بيانات السحابة. إذا أجريت تعديلات أثناء الانقطاع، صدّر نسخة JSON أولاً. متابعة؟"))return;
+    const uid=fbAuth.currentUser.uid;
+    try{
+      setSyncState("syncing");
+      const {data,found}=await loadCloudDBOnce(uid);
+      if(!currentUser||currentUser.uid!==uid)return;
+      DB=found?data:loadLocalDB(uid);
+      rememberCloudState();
+      cloudReady=true;ST.cloudError=false;
+      saveLocalDB();attachRealtimeListeners(uid);
+      if(!found){lastSavedValues={};saveDB();}
+      if(!pendingKeys.size)setSyncState(navigator.onLine?"online":"offline");
+      render();
+    }catch(e){lastCloudError=e?.message||"error";setSyncState("error");alert("تعذّر الاتصال بالسحابة.");}
+  },
   async resetPassword(){
     if(!fbAuth)return alert("خدمة استعادة الحساب غير جاهزة.");
     const email=(ST.emailInput||"").trim();
@@ -1990,14 +2012,13 @@ if(isPublicRoute){
         const {data,found}=await loadCloudDBOnce(uid);
         if(!currentUser||currentUser.uid!==uid)return;
         DB=found?data:loadLocalDB(uid);
+        ST.cloudError=false;
         rememberCloudState();
         saveLocalDB();
         cloudReady=true;
         attachRealtimeListeners(uid);
         if(!found){
-          // Only this account's own local copy may be uploaded.
-          const savedCopy=loadLocalDB(uid);
-          DB=savedCopy;
+          // A server-confirmed empty account can initialize its own data only.
           lastSavedValues={};
           saveDB();
         }
@@ -2007,14 +2028,16 @@ if(isPublicRoute){
         console.warn("Cloud loading failed; retaining account-scoped local data",e);
         DB=loadLocalDB(uid);
         rememberCloudState();
-        cloudReady=true;
-        attachRealtimeListeners(uid);
-        setSyncState("offline");
+        cloudReady=false; // No writes without a server-confirmed snapshot.
+        ST.cloudError=true;
+        lastCloudError=e?.message||"Cloud unavailable";
+        setSyncState("error");
       }
       ST.authBusy=false;ST.pinError="";
       ST.adminPage="dashboard";
     }else{
       DB=defaultDB();
+      ST.cloudError=false;
       ST.authBusy=false;
       ST.screen="landing";
     }
