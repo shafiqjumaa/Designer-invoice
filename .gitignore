@@ -1,0 +1,14 @@
+# Customer and financial records must never be committed
+designer-backup*.json
+*backup*.json
+exports/
+private/
+*.pdf
+.env
+.env.*
+!.env.example
+.firebase/
+node_modules/
+dist/
+*.log
+.DS_Store
