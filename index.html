@@ -319,6 +319,17 @@ function initFirebase(){
     return true;
   }catch(e){console.error("Firebase initialization failed",e);return false;}
 }
+async function withDeadline(promise,ms,code){
+  let timeoutId;
+  try{
+    return await Promise.race([
+      promise,
+      new Promise((_,reject)=>{
+        timeoutId=setTimeout(()=>reject({code,message:"Request timed out"}),ms);
+      })
+    ]);
+  }finally{clearTimeout(timeoutId);}
+}
 function userLocalKey(uid){return USER_STORAGE_PREFIX+uid;}
 function loadLocalDB(uid){
   if(!uid)return defaultDB();
@@ -442,7 +453,8 @@ function authErrorMessage(err){
     "auth/email-already-in-use":"البريد الإلكتروني مستخدم بالفعل.",
     "auth/user-not-found":"الحساب غير موجود؛ أنشئ حساباً أولاً.",
     "auth/too-many-requests":"محاولات كثيرة، حاول لاحقاً.",
-    "auth/network-request-failed":"لا يوجد اتصال بالإنترنت.",
+    "auth/network-request-failed":"تعذّر الاتصال بخوادم تسجيل الدخول. تحقق من الإنترنت ثم أعد المحاولة.",
+    "auth/timeout":"تأخر رد خدمة تسجيل الدخول. أعد المحاولة بعد التحقق من الاتصال؛ لا تمسح بيانات المتصفح.",
     "auth/invalid-credential":"بيانات الدخول غير صحيحة.",
     "auth/user-disabled":"هذا الحساب معطّل."
   };
@@ -482,7 +494,7 @@ let ST = {
   pinInput: "", pinError: "", pinShow:false,
   calMonth: new Date().getMonth(), calYear: new Date().getFullYear(),
   signPad: null,
-  emailInput: "", authBusy: false, cloudError:false,
+  emailInput: "", authBusy: false, cloudError:false, cloudLoading:false,
   workFilter:"all", invoiceFilter:"all"
 };
 
@@ -761,6 +773,12 @@ function renderClientForm(){
 
 /* ===================== ADMIN SHELL ===================== */
 function renderAdmin(){
+  if(ST.cloudLoading)return `<div class="landing-wrap"><div class="card" style="max-width:430px;width:100%;text-align:center;">
+    <div class="logo-circle" style="background:var(--greenBg);color:var(--green);">${icon("lock",23)}</div>
+    <h2>تم تسجيل الدخول</h2>
+    <p class="muted small">نقرأ بياناتك من السحابة الآن. لن يُسمح بتعديل أي بيانات قبل اكتمال التحقق.</p>
+    <p class="small">إذا تعذّر الاتصال فستظهر رسالة واضحة وخيار لإعادة المحاولة دون حذف بياناتك.</p>
+  </div></div>`;
   const stats = calcStats();
   return `
   <div class="admin-layout">
@@ -1673,21 +1691,27 @@ const App = {
   setPin(v){ ST.pinError=""; ST.pinInput=v; },
   togglePinShow(){ ST.pinShow=!ST.pinShow; render(); setTimeout(()=>document.getElementById("pinField")?.focus(),0); },
   async tryLogin(){
-    if(!isFirebaseConfigured() || !fbAuth){
-      ST.pinError="تعذر الاتصال بـ Firebase. النسخة المنشورة قديمة؛ حدّث ملفات GitHub Pages.";
-      render();
-      return;
+    if(ST.authBusy)return;
+    if(!isFirebaseConfigured()||!fbAuth){
+      ST.pinError="تعذّر بدء Firebase. تحقق من تحميل الصفحة ثم جرّب مجدداً.";
+      render();return;
     }
-    const email = (ST.emailInput||"").trim();
-    const pass = ST.pinInput||"";
-    if(!email || !pass){ ST.pinError="أدخل البريد وكلمة السر"; render(); return; }
-    ST.authBusy=true; ST.pinError=""; render();
-    try{ localStorage.setItem("designerAppLastEmail", email); }catch(e){}
+    const email=(ST.emailInput||"").trim();
+    const pass=ST.pinInput||"";
+    if(!email||!pass){ST.pinError="أدخل البريد وكلمة المرور";render();return;}
+    ST.authBusy=true;ST.pinError="";ST.pinShow=false;render();
+    try{localStorage.setItem("designerAppLastEmail",email);}catch(e){}
     try{
-      await fbAuth.signInWithEmailAndPassword(email, pass);
-      // بقية الإجراءات (تحميل البيانات، الانتقال للوحة التحكم) تتم في onAuthStateChanged
+      await withDeadline(fbAuth.signInWithEmailAndPassword(email,pass),18000,"auth/timeout");
+      ST.pinInput="";ST.authBusy=false;
+      // onAuthStateChanged loads data into a read-only loading screen.
+      if(ST.screen==="login"){
+        ST.pinError="تمت المصادقة؛ جارِ تجهيز حسابك...";
+        render();
+      }
     }catch(err){
-      ST.authBusy=false; ST.pinError=authErrorMessage(err); render(); return;
+      ST.authBusy=false;ST.pinError=authErrorMessage(err);
+      if(ST.screen==="login")render();
     }
   },
   async createAccount(){
@@ -1695,8 +1719,10 @@ const App = {
     const email=(ST.emailInput||"").trim(),pass=ST.pinInput||"";
     if(!email||pass.length<6)return alert("أدخل البريد وكلمة مرور لا تقل عن 6 أحرف.");
     ST.authBusy=true;render();
-    try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
-    catch(e){ST.pinError=authErrorMessage(e);ST.authBusy=false;render();}
+    try{
+      await withDeadline(fbAuth.createUserWithEmailAndPassword(email,pass),18000,"auth/timeout");
+      ST.pinInput="";ST.pinShow=false;ST.authBusy=false;
+    }catch(e){ST.pinError=authErrorMessage(e);ST.authBusy=false;render();}
   },
   async retryCloudConnection(){
     if(!fbAuth?.currentUser)return alert("سجّل الدخول أولاً.");
@@ -2162,12 +2188,18 @@ if(isPublicRoute){
   fbAuth.onAuthStateChanged(async user=>{
     resetCloudSession();
     currentUser=user;
+    ST.authBusy=false;
     if(user){
       const uid=user.uid;
       ST.screen="admin";
+      ST.adminPage="dashboard";
+      ST.cloudError=false;
+      ST.cloudLoading=true;
+      ST.pinInput="";ST.pinShow=false;ST.pinError="";
       setSyncState("syncing");
+      render(); // Avoid leaving the login button stuck while Firestore loads.
       try{
-        const {data,found}=await loadCloudDBOnce(uid);
+        const {data,found}=await withDeadline(loadCloudDBOnce(uid),15000,"cloud/timeout");
         if(!currentUser||currentUser.uid!==uid)return;
         DB=found?data:loadLocalDB(uid);
         ST.cloudError=false;
@@ -2192,14 +2224,20 @@ if(isPublicRoute){
         setSyncState("error");
       }
       ST.authBusy=false;ST.pinError="";
+      ST.cloudLoading=false;
       ST.adminPage="dashboard";
     }else{
       DB=defaultDB();
-      ST.cloudError=false;
+      ST.cloudError=false;ST.cloudLoading=false;
       ST.authBusy=false;
       ST.screen="landing";
     }
     render();
+  },error=>{
+    console.error("Firebase auth session failed",error);
+    ST.authBusy=false;ST.cloudLoading=false;
+    ST.pinError=authErrorMessage(error);
+    ST.screen="login";render();
   });
   render();
 }
