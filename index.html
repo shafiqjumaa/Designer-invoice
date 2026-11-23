@@ -5,9 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DesignerFlow | نظام إدارة أعمال المصمم</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#050914">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!-- Flaticon Uicons · Solid Rounded. Keep original SVG icons as a network fallback. -->
+<link href="https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css"
+      rel="stylesheet" onload="document.documentElement.classList.add('uicons-ready')"
+      onerror="document.documentElement.classList.remove('uicons-ready')">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Firebase (تخزين سحابي + مزامنة + دعم العمل بدون إنترنت) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -182,8 +189,10 @@ details summary::-webkit-details-marker{display:none;}
   .theme-fab{top:14px;left:14px;}
 }
 </style>
+<link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-neon-v1">
 </head>
 <body>
+<div class="df-ambient" aria-hidden="true"><span class="glow glow-a"></span><span class="glow glow-b"></span><span class="glow glow-c"></span><span class="grid-layer"></span></div>
 <button id="themeToggleBtn" class="theme-fab" onclick="App.toggleTheme()" title="تبديل المظهر"></button>
 <div id="app"></div>
 <div id="modalRoot"></div>
@@ -235,9 +244,55 @@ const ICON_PATHS = {
   wallet:'<path d="M21 7H6a3 3 0 010-6h13v2H6a1 1 0 000 2h15v15a2 2 0 01-2 2H5a2 2 0 01-2-2V8a1 1 0 011-1h17zm-5 6a2 2 0 100 4 2 2 0 000-4z"/>',
   package:'<path d="M12 2l8.5 4.9v9.2L12 21 3.5 16.1V6.9L12 2zm0 2.3L5.5 8v7.3L12 19l6.5-3.7V8L12 4.3zM11 9h2v7h-2V9z"/>'
 };
+const UI_SOLID_ROUNDED = Object.freeze({
+  home:"home",
+  palette:"palette",
+  receipt:"receipt",
+  users:"users",
+  inbox:"inbox",
+  settings:"settings",
+  lock:"lock",
+  logout:"sign-out-alt",
+  link:"link",
+  plus:"plus",
+  edit:"edit",
+  trash:"trash",
+  check:"check",
+  chevronLeft:"angle-left",
+  chevronRight:"angle-right",
+  eye:"eye",
+  printer:"print",
+  copy:"copy",
+  image:"picture",
+  building:"building",
+  person:"user",
+  sun:"sun",
+  moon:"moon",
+  close:"cross",
+  bell:"bell",
+  dollar:"dollar",
+  clock:"time-quarter-to",
+  trendUp:"chart-line-up",
+  trendDown:"chart-line-down",
+  userPlus:"user-add",
+  clipboard:"clipboard-list",
+  calculator:"calculator",
+  send:"paper-plane",
+  download:"download",
+  upload:"upload",
+  minus:"minus",
+  calendar:"calendar",
+  target:"bullseye",
+  document:"document",
+  wallet:"wallet",
+  package:"box"
+});
 function icon(name, size){
-  size = size||18;
-  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" style="vertical-align:middle">${ICON_PATHS[name]||''}</svg>`;
+  const px=Math.max(10,Math.min(48,Number(size)||18));
+  const mapped=UI_SOLID_ROUNDED[name];
+  const svg=`<svg class="df-icon-svg" viewBox="0 0 24 24" width="${px}" height="${px}" fill="currentColor" aria-hidden="true">${ICON_PATHS[name]||ICON_PATHS.document}</svg>`;
+  return `<span class="df-icon${mapped?" has-flaticon":""}" aria-hidden="true" style="--icon-size:${px}px">`+
+    (mapped?`<i class="fi fi-sr-${mapped}" aria-hidden="true"></i>`:"")+svg+`</span>`;
 }
 
 /* ===================== STATIC DATA ===================== */
