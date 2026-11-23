@@ -10,12 +10,12 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <!-- Flaticon Uicons · Solid Rounded. Keep original SVG icons as a network fallback. -->
 <link href="https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css"
-      rel="stylesheet" onload="document.documentElement.classList.add('uicons-ready');requestAnimationFrame(()=>window.verifyFlaticonIcons?.())"
+      rel="stylesheet" media="print" onload="this.media='all';document.documentElement.classList.add('uicons-ready');requestAnimationFrame(()=>window.verifyFlaticonIcons?.())"
       onerror="document.documentElement.classList.remove('uicons-ready')">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Firebase (تخزين سحابي + مزامنة + دعم العمل بدون إنترنت) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
