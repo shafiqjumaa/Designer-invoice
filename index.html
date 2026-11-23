@@ -264,6 +264,7 @@ let cloudReady=false, saveTimer=null, unsubscribers=[];
 let pendingKeys=new Set(), inFlightKeys=new Set();
 let lastSavedValues={}, writeInProgress=false;
 let syncState="local";
+let lastCloudError="";
 
 function isFirebaseConfigured(){
   return Boolean(firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("PASTE_"));
@@ -340,6 +341,7 @@ function pushDBToCloud(){
   writeInProgress=true;
   setSyncState(navigator.onLine?"syncing":"offline");
   batch.commit().then(()=>{
+    lastCloudError="";
     if(!currentUser||currentUser.uid!==uid)return;
     keys.forEach(k=>inFlightKeys.delete(k));
     writeInProgress=false;
@@ -347,10 +349,11 @@ function pushDBToCloud(){
     else setSyncState(navigator.onLine?"online":"offline");
   }).catch(e=>{
     console.error("Cloud write failed",e);
+    lastCloudError=e?.code||e?.message||"unknown";
     if(!currentUser||currentUser.uid!==uid)return;
     keys.forEach(k=>{inFlightKeys.delete(k);pendingKeys.add(k);});
     writeInProgress=false;
-    setSyncState("offline");
+    setSyncState("error");
   });
 }
 async function loadCloudDBOnce(uid){
@@ -379,7 +382,7 @@ function attachRealtimeListeners(uid){
         lastSavedValues[key]=JSON.stringify(remote);
         if(!pendingKeys.size&&!writeInProgress)
           setSyncState(snap.metadata.fromCache?"offline":"online");
-      },e=>{console.error("Realtime sync failed",e);setSyncState("offline");});
+      },e=>{console.error("Realtime sync failed",e);lastCloudError=e?.code||e?.message||"unknown";setSyncState("error");});
     unsubscribers.push(unsub);
   });
 }
@@ -391,7 +394,7 @@ function resetCloudSession(){
   clearTimeout(saveTimer);
   detachRealtimeListeners();
   pendingKeys.clear();inFlightKeys.clear();
-  lastSavedValues={};writeInProgress=false;cloudReady=false;
+  lastSavedValues={};writeInProgress=false;cloudReady=false;lastCloudError="";
 }
 function authErrorMessage(err){
   const code=err&&err.code;
@@ -417,13 +420,14 @@ function sidebarSyncStatusHtml(){
   if(!currentUser)return '<div id="sidebarSyncStatus"><span class="sync-dot"></span> غير مسجل دخول</div>';
   if(syncState==="syncing")return '<div id="sidebarSyncStatus" class="st-syncing"><span class="sync-dot spin"></span> جارِ المزامنة...</div>';
   if(syncState==="offline")return '<div id="sidebarSyncStatus" class="st-offline"><span class="sync-dot"></span> غير متصل / تغييرات بانتظار الحفظ</div>';
+  if(syncState==="error")return '<div id="sidebarSyncStatus" class="st-offline" title="'+esc(lastCloudError)+'"><span class="sync-dot"></span> فشل الحفظ السحابي — راجع الإعدادات</div>';
   if(syncState==="online")return '<div id="sidebarSyncStatus" class="st-online"><span class="sync-dot"></span> محفوظ بالسحابة</div>';
   return '<div id="sidebarSyncStatus"><span class="sync-dot"></span> جارِ التهيئة...</div>';
 }
 window.addEventListener("online",()=>{
   if(!currentUser)return;
   if(pendingKeys.size)pushDBToCloud();
-  else setSyncState(cloudReady?"online":"offline");
+  else if(syncState!=="error")setSyncState(cloudReady?"online":"offline");
 });
 window.addEventListener("offline",()=>{if(currentUser)setSyncState("offline");});
 
@@ -1141,12 +1145,12 @@ function pageSettings(){
       <div class="field"><label class="lbl">رابط موقعك الخاص</label><input placeholder="https://example.com" value="${esc(s.businessWebsite)}" oninput="App.setSetting('businessWebsite', this.value)"></div>
       <div class="field"><label class="lbl">رقم واتساب لاستلام طلبات العملاء</label><input placeholder="9639xxxxxxxx" value="${esc(s.businessWhatsapp)}" oninput="App.setSetting('businessWhatsapp', this.value)"></div>
     </div>
-    <p class="small muted">رابط موقعك يظهر للعميل في صفحة الفاتورة. ورقم الواتساب يُستخدم لإرسال ردود استبيان العملاء إليك مباشرة عند استخدام رابط الاستبيان أدناه.</p>
+    <p class="small muted">رابط موقعك يظهر للعميل في صفحة الفاتورة. رقم واتساب يُضمَّن في رابط الاستبيان لتجهيز رسالة يرسلها العميل بنفسه. الطلب العام لا يُخزَّن حالياً في لوحة التحكم؛ يجب أن يكمل العميل الإرسال في واتساب.</p>
   </div>
   <div class="card" style="margin-bottom:18px;">
     <h3 style="margin-top:0;">روابط تشاركها مع عملائك</h3>
     <div class="flex between center" style="flex-wrap:wrap;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div><div class="bold small">استبيان طلب مشروع جديد</div><div class="muted small">أرسل هذا الرابط لأي عميل ليعبّئ طلبه، ويصلك مباشرة على واتساب.</div></div>
+      <div><div class="bold small">استبيان طلب مشروع جديد</div><div class="muted small">أرسل الرابط للعميل، ثم عليه تأكيد إرسال رسالة الطلب عبر واتساب.</div></div>
       <button class="btn btn-soft" onclick="App.copyClientFormLink()">${icon('copy',14)} نسخ الرابط</button>
     </div>
     <div style="padding:10px 0;">
@@ -1978,7 +1982,7 @@ if(isPublicRoute){
           lastSavedValues={};
           saveDB();
         }
-        setSyncState(navigator.onLine?"online":"offline");
+        if(!pendingKeys.size&&!writeInProgress)setSyncState(navigator.onLine?"online":"offline");
       }catch(e){
         if(!currentUser||currentUser.uid!==uid)return;
         console.warn("Cloud loading failed; retaining account-scoped local data",e);
