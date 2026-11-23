@@ -135,3 +135,62 @@ test('existing business workflows are still reachable in the workspace',()=>{
   assert.match(script, /\$\{renderAdminPage\(stats\)\}/);
   assert.match(script, /function topbarSyncStatusHtml\(\)/);
 });
+
+
+test('mobile client survey preserves focus and typed text',()=>{
+  const match=script.match(/\n  surveySet\(field,val\)\{([\s\S]*?)\n  \},\n  surveyToggleArr/);
+  assert.ok(match,'Survey input controller not found');
+  const ST={surveyDraft:{}};
+  const document={activeElement:{tagName:'INPUT',isContentEditable:false}};
+  let renders=0;
+  const surveySet=new Function('ST','document','render',
+    'return function(field,val){'+match[1]+'};')(ST,document,()=>renders++);
+  surveySet('name','test user');
+  surveySet('whatsapp','9639000000');
+  assert.equal(ST.surveyDraft.name,'test user');
+  assert.equal(ST.surveyDraft.whatsapp,'9639000000');
+  assert.equal(renders,0,'Mobile input should not be replaced mid-typing');
+  document.activeElement={tagName:'TEXTAREA',isContentEditable:false};
+  surveySet('notes','notes');
+  assert.equal(renders,0);
+  document.activeElement={tagName:'BUTTON',isContentEditable:false};
+  surveySet('budget','200');
+  assert.equal(renders,1,'Selecting a chip should redraw the active selection');
+  document.activeElement={tagName:'SELECT',isContentEditable:false};
+  surveySet('serviceType','تصميم سوشيال ميديا');
+  assert.equal(renders,2,'Service selection should redraw the questionnaire');
+});
+test('mobile layout handles small widths, keyboard and screen safe areas',()=>{
+  const css=fs.readFileSync(path.join(root,'assets/orizon-theme.css'),'utf8');
+  assert.match(css, /Mobile reliability and layout patch/);
+  assert.match(css, /@media\(max-width:700px\)/);
+  assert.match(css, /@media\(max-width:700px\)/);
+  assert.match(html, /viewport-fit=cover/);
+  assert.match(css, /env\(safe-area-inset-bottom/);
+  assert.match(css, /font-size:16px!important/);
+  assert.match(css, /max-height:calc\(100dvh/);
+  assert.match(css, /\.df-kpi-grid/);
+  assert.match(css, /\.modal-overlay/);
+  assert.match(css, /\.invoice-paper/);
+  assert.match(css, /\.theme-fab/);
+  assert.match(css, /\.fab/);
+});
+test('solid rounded icons/fonts and PNG renderer are nonblocking',()=>{
+  assert.match(html, /fonts\.googleapis\.com[^\n]*media="print" onload=/);
+  assert.match(html, /uicons-solid-rounded\/css\/uicons-solid-rounded\.css"[\s\S]{0,70}media="print"/);
+  assert.match(html, /<script defer src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/html2canvas/);
+});
+test('mobile component fields have readable labels',()=>{
+  assert.match(script, /df-component-field/);
+  assert.match(script, /df-component-label/);
+  assert.match(script, /df-comp-action-text/);
+  assert.match(script, /df-comp-head/);
+});
+test('installed mobile app uses current CSS and supports landscape',()=>{
+  const sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
+  const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
+  assert.match(sw, /designerflow-shell-v5/);
+  assert.match(sw, /orizon-theme\.css\?v=20261123-mobile-v2/);
+  assert.match(html, /orizon-theme\.css\?v=20261123-mobile-v2/);
+  assert.equal(manifest.orientation,'any');
+});
