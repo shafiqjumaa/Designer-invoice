@@ -519,6 +519,8 @@ function setSyncState(state){
   syncState=state;
   const el=document.getElementById("sidebarSyncStatus");
   if(el)el.outerHTML=sidebarSyncStatusHtml();
+  const top=document.getElementById("topbarSyncStatus");
+  if(top)top.innerHTML=topbarSyncStatusHtml();
 }
 function sidebarSyncStatusHtml(){
   if(!currentUser)return '<div id="sidebarSyncStatus"><span class="sync-dot"></span> غير مسجل دخول</div>';
@@ -843,7 +845,7 @@ function renderAdmin(){
       <div class="brand-header">
         <div class="brand-logo">${icon('palette',20)}</div>
         <div class="brand-text">
-          <div class="bold">لوحة المصمم</div>
+          <div class="bold">DesignerFlow</div>
           ${sidebarSyncStatusHtml()}
         </div>
       </div>
@@ -872,10 +874,35 @@ function renderAdmin(){
       </div>
       <div>
         <button class="navbtn" style="background:var(--greenBg);color:var(--accent2);" onclick="App.goClient()">${icon('link',18)} <span class="navlabel">فتح كنموذج للعميل</span></button>
-        <button class="navbtn" onclick="App.lock()">${icon('logout',18)} <span class="navlabel">قفل اللوحة</span></button>
+        <button class="navbtn" onclick="App.lock()">${icon('logout',18)} <span class="navlabel">تسجيل الخروج</span></button>
+        <div style="padding:14px 10px 2px;font-size:10px;color:var(--muted);">
+          Uicons by <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener noreferrer" style="color:var(--muted);text-decoration:underline;">Flaticon</a>
+        </div>
       </div>
     </aside>
     <main class="main">
+      <header class="df-topbar">
+        <div class="df-topbar-context">
+          <div>
+            <span class="df-topbar-breadcrumb">DESIGNERFLOW / WORKSPACE</span>
+            <span class="df-topbar-heading">${({dashboard:"لوحة التحكم",work:"المشاريع",clients:"العملاء",invoices:"الفواتير",contracts:"العقود",expenses:"المصاريف",subscriptions:"الاشتراكات",responses:"الطلبات",waitlist:"قائمة الانتظار",goals:"الأهداف",settings:"الإعدادات"})[ST.adminPage]||"مساحة العمل"}</span>
+          </div>
+        </div>
+        <div class="df-topbar-actions">
+          <span id="topbarSyncStatus">${topbarSyncStatusHtml()}</span>
+          <button class="df-topbar-search" type="button" onclick="App.setAdminPage('dashboard');document.getElementById('globalSearch')?.focus()" aria-label="بحث سريع">
+            ${icon('eye',15)} <span class="df-search-label">بحث سريع</span><kbd>/</kbd>
+          </button>
+          <details class="df-create-dropdown">
+            <summary class="btn btn-primary" aria-label="إنشاء عنصر جديد">${icon("plus",15)} إنشاء جديد</summary>
+            <div class="df-create-menu">
+              <button type="button" onclick="App.openBatchMetaModal()">${icon("palette",16)} مشروع جديد</button>
+              <button type="button" onclick="App.openClientModal()">${icon("users",16)} عميل جديد</button>
+              <button type="button" onclick="App.openInvoiceModal()">${icon("receipt",16)} فاتورة جديدة</button>
+            </div>
+          </details>
+        </div>
+      </header>
       <div class="main-inner">
       ${backupBanner()}
       ${renderAdminPage(stats)}
@@ -891,6 +918,11 @@ function backupBanner(){
     <span class="flex gap center small">${icon(done?'check':'bell',16)} ${done? "تم تصدير نسخة يدوية اليوم" : "احفظ نسخة احتياطية يدوية دورياً"}</span>
     <button class="btn btn-soft small" onclick="App.exportBackup()">${icon('download',13)} نسخة الآن</button>
   </div>`;
+}
+function topbarSyncStatusHtml(){
+  const state=currentUser?(syncState==="online"?"online":syncState==="syncing"?"syncing":syncState==="error"?"error":"offline"):"offline";
+  const label=state==="online"?"متزامن":state==="syncing"?"جارِ الحفظ":state==="error"?"خطأ في المزامنة":"غير متصل";
+  return `<span class="df-sync-chip ${state}"><span class="sync-dot"></span>${label}</span>`;
 }
 function navBtn(page, iconName, label, badge){
   return `<button class="navbtn ${ST.adminPage===page?'active':''}" onclick="App.setAdminPage('${page}')">${icon(iconName,18)} <span class="navlabel">${label}</span>${badge?`<span class="nav-badge">${badge}</span>`:""}</button>`;
@@ -913,7 +945,14 @@ function renderAdminPage(stats){
 function pageDashboard(stats){
   const recentBatches = DB.batches.slice(-5).reverse();
   return `
-  <h1 class="page-title">نظرة سريعة</h1>
+  <section class="df-hero">
+    <div class="df-hero-copy">
+      <div class="df-eyebrow">DESIGNER WORKSPACE</div>
+      <h1>كل أعمالك، بصورة أوضح.</h1>
+      <p>راقب المشاريع والمدفوعات، وابدأ مهمتك التالية من مساحة واحدة منظمة.</p>
+    </div>
+    <div class="df-hero-orbit" aria-hidden="true">${icon("palette",40)}</div>
+  </section>
   ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
     <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للعرض فقط. لا يمكن تعديل البيانات قبل إعادة الاتصال. يمكنك تنزيل نسخة JSON للحفظ.</div></div>
     <button class="btn btn-soft" onclick="App.exportBackup()">حفظ نسخة JSON</button>
@@ -952,7 +991,7 @@ function emptyState(iconName, text, ctaLabel, ctaOnclick){
   </div>`;
 }
 function statCard(iconName,label,value,bg,color){
-  return `<div class="card"><div class="icon-box" style="width:40px;height:40px;background:${bg};color:${color};margin-bottom:10px;">${icon(iconName,20)}</div><div style="font-size:21px;font-weight:bold;">${value}</div><div class="muted small" style="margin-top:4px;">${label}</div></div>`;
+  return `<div class="card df-kpi"><div class="icon-box" style="background:${bg};color:${color};">${icon(iconName,19)}</div><div class="df-kpi-value">${value}</div><div class="df-kpi-label">${label}</div></div>`;
 }
 
 /* ---------- DESIGN WORKS ---------- */
