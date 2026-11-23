@@ -105,6 +105,8 @@ body.light .df-ambient{opacity:.23;}
 html.uicons-ready .df-icon.has-flaticon .fi{display:inline-flex;align-items:center;justify-content:center;}
 html.uicons-ready .df-icon.has-flaticon .df-icon-svg{display:none;}
 .df-icon .fi:before{display:block;line-height:1;}
+html.uicons-ready .df-icon.icon-fallback .fi{display:none!important;}
+html.uicons-ready .df-icon.icon-fallback .df-icon-svg{display:block!important;}
 /* Application navigation */
 .admin-layout{isolation:isolate;}
 .sidebar{
