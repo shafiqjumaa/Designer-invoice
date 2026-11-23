@@ -91,6 +91,15 @@ label.lbl{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
 .brand-text{min-width:0;overflow:hidden;}
 .brand-text .bold{font-size:14.5px;white-space:nowrap;}
 .navlist{overflow-y:auto;flex:1;}
+.nav-group{border-radius:12px;margin-bottom:2px;}
+.nav-group[open]{background:color-mix(in srgb,var(--panel2) 58%,transparent);}
+.nav-group>summary{list-style:none;}
+.nav-group>summary::-webkit-details-marker{display:none;}
+.nav-group .group-chevron{margin-right:auto;transition:transform .15s;}
+.nav-group[open] .group-chevron{transform:rotate(-90deg);}
+.nav-sub{padding:2px 12px 5px 0;}
+.nav-sub .navbtn{font-size:12px;padding:9px 10px;}
+@media(max-width:700px){.nav-sub{padding:0;}.nav-group .group-chevron{display:none;}}
 .navbtn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:var(--muted);background:transparent;width:100%;text-align:right;font-size:13.5px;margin-bottom:3px;position:relative;}
 .navbtn:hover{background:var(--panel2);color:var(--text);}
 .navbtn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
@@ -705,15 +714,25 @@ function renderAdmin(){
       </div>
       <div class="navlist">
         ${navBtn("dashboard","home","الرئيسية")}
-        ${navBtn("work","palette","أعمال التصميم")}
-        ${navBtn("subscriptions","package","الاشتراكات", DB.subscriptions.filter(s=>s.renewalDate && Math.ceil((new Date(s.renewalDate)-new Date())/86400000)<=7 && s.status==="نشط").length)}
-        ${navBtn("invoices","receipt","الفواتير", DB.invoices.length)}
-        ${navBtn("contracts","document","العقود", DB.contracts.filter(c=>c.status!=="موقع").length)}
-        ${navBtn("expenses","wallet","المصاريف")}
-        ${navBtn("waitlist","calendar","قائمة الانتظار", DB.waitlist.length)}
-        ${navBtn("goals","target","أهدافي")}
+        ${navBtn("work","palette","المشاريع والأعمال")}
         ${navBtn("clients","users","العملاء")}
-        ${navBtn("responses","inbox","الردود الواردة", DB.responses.filter(r=>!r.converted).length)}
+        <details class="nav-group" ${["invoices","contracts","expenses","subscriptions"].includes(ST.adminPage)?"open":""}>
+          <summary class="navbtn group-heading">${icon("wallet",18)} <span class="navlabel">المالية والعقود</span> <span class="group-chevron">${icon("chevronLeft",12)}</span></summary>
+          <div class="nav-sub">
+            ${navBtn("invoices","receipt","الفواتير",DB.invoices.length)}
+            ${navBtn("contracts","document","العقود",DB.contracts.filter(c=>c.status!=="موقع").length)}
+            ${navBtn("expenses","wallet","المصاريف")}
+            ${navBtn("subscriptions","package","الاشتراكات", DB.subscriptions.filter(s=>s.renewalDate && Math.ceil((new Date(s.renewalDate)-new Date())/86400000)<=7 && s.status==="نشط").length)}
+          </div>
+        </details>
+        <details class="nav-group" ${["waitlist","goals","responses"].includes(ST.adminPage)?"open":""}>
+          <summary class="navbtn group-heading">${icon("inbox",18)} <span class="navlabel">الطلبات والتخطيط</span> <span class="group-chevron">${icon("chevronLeft",12)}</span></summary>
+          <div class="nav-sub">
+            ${navBtn("responses","inbox","الطلبات الواردة",DB.responses.filter(r=>!r.converted).length)}
+            ${navBtn("waitlist","calendar","قائمة الانتظار",DB.waitlist.length)}
+            ${navBtn("goals","target","الأهداف")}
+          </div>
+        </details>
         ${navBtn("settings","settings","الإعدادات")}
       </div>
       <div>
