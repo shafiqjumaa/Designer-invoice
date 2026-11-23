@@ -110,3 +110,28 @@ test('deadline rejects hung calls and resolves responsive calls',async()=>{
   assert.equal(await withDeadline(Promise.resolve('ok'),20,'timeout'),'ok');
   await assert.rejects(withDeadline(new Promise(()=>{}),10,'auth/timeout'),e=>e.code==='auth/timeout');
 });
+
+test('neon design system is present and keeps reduced-motion accessibility',()=>{
+  const css=fs.readFileSync(path.join(root,'assets/orizon-theme.css'),'utf8');
+  assert.match(css, /\.df-ambient/);
+  assert.match(css, /@keyframes df-glow-one/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(css, /\.df-kpi/);
+  assert.match(css, /\.df-topbar/);
+  assert.match(css, /\.df-create-menu/);
+  assert.match(css, /\.df-icon\.icon-fallback/);
+});
+test('solid rounded Flaticon CSS is optional with original SVG fallback',()=>{
+  assert.match(html, /uicons-solid-rounded\/css\/uicons-solid-rounded\.css/);
+  assert.match(html, /Uicons by <a href="https:\/\/www\.flaticon\.com\/uicons"/);
+  assert.match(script, /const UI_SOLID_ROUNDED = Object\.freeze/);
+  assert.match(script, /function verifyFlaticonIcons\(\)/);
+  assert.match(script, /ICON_PATHS\[name\]\|\|ICON_PATHS\.document/);
+});
+test('existing business workflows are still reachable in the workspace',()=>{
+  assert.match(script, /onclick="App\.openBatchMetaModal\(\)"/);
+  assert.match(script, /onclick="App\.openClientModal\(\)"/);
+  assert.match(script, /onclick="App\.openInvoiceModal\(\)"/);
+  assert.match(script, /\$\{renderAdminPage\(stats\)\}/);
+  assert.match(script, /function topbarSyncStatusHtml\(\)/);
+});
