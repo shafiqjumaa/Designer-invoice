@@ -5,9 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DesignerFlow | نظام إدارة أعمال المصمم</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#050914">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!-- Flaticon Uicons · Solid Rounded. Keep original SVG icons as a network fallback. -->
+<link href="https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css"
+      rel="stylesheet" onload="document.documentElement.classList.add('uicons-ready');requestAnimationFrame(()=>window.verifyFlaticonIcons?.())"
+      onerror="document.documentElement.classList.remove('uicons-ready')">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Firebase (تخزين سحابي + مزامنة + دعم العمل بدون إنترنت) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -182,8 +189,10 @@ details summary::-webkit-details-marker{display:none;}
   .theme-fab{top:14px;left:14px;}
 }
 </style>
+<link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-neon-v1">
 </head>
 <body>
+<div class="df-ambient" aria-hidden="true"><span class="glow glow-a"></span><span class="glow glow-b"></span><span class="glow glow-c"></span><span class="grid-layer"></span></div>
 <button id="themeToggleBtn" class="theme-fab" onclick="App.toggleTheme()" title="تبديل المظهر"></button>
 <div id="app"></div>
 <div id="modalRoot"></div>
@@ -193,6 +202,7 @@ details summary::-webkit-details-marker{display:none;}
 <script>
 /* ===================== ICONS ===================== */
 const ICON_PATHS = {
+  search:'<path d="M10.5 2a8.5 8.5 0 1 0 5.43 15.04l4.01 4.01a1.5 1.5 0 0 0 2.12-2.12l-4.01-4.01A8.5 8.5 0 0 0 10.5 2Zm0 3a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z"/>',
   home:'<path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/>',
   palette:'<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17c2.8 0 5-2.2 5-5 0-5-4.9-8.5-10-8.5zM6.5 11A1.5 1.5 0 118 9.5 1.5 1.5 0 016.5 11zm3-4A1.5 1.5 0 1111 5.5 1.5 1.5 0 019.5 7zm5 0A1.5 1.5 0 1116 5.5 1.5 1.5 0 0114.5 7zm3 4A1.5 1.5 0 1119 9.5 1.5 1.5 0 0117.5 11z"/>',
   receipt:'<path d="M6 2l1.5 1.5L9 2l1.5 1.5L12 2l1.5 1.5L15 2l1.5 1.5L18 2v20l-1.5-1.5L15 22l-1.5-1.5L12 22l-1.5-1.5L9 22l-1.5-1.5L6 22V2zm2 6h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>',
@@ -235,9 +245,68 @@ const ICON_PATHS = {
   wallet:'<path d="M21 7H6a3 3 0 010-6h13v2H6a1 1 0 000 2h15v15a2 2 0 01-2 2H5a2 2 0 01-2-2V8a1 1 0 011-1h17zm-5 6a2 2 0 100 4 2 2 0 000-4z"/>',
   package:'<path d="M12 2l8.5 4.9v9.2L12 21 3.5 16.1V6.9L12 2zm0 2.3L5.5 8v7.3L12 19l6.5-3.7V8L12 4.3zM11 9h2v7h-2V9z"/>'
 };
+const UI_SOLID_ROUNDED = Object.freeze({
+  search:"search",
+  home:"home",
+  palette:"palette",
+  receipt:"receipt",
+  users:"users",
+  inbox:"inbox",
+  settings:"settings",
+  lock:"lock",
+  logout:"sign-out-alt",
+  link:"link",
+  plus:"plus",
+  edit:"edit",
+  trash:"trash",
+  check:"check",
+  chevronLeft:"angle-left",
+  chevronRight:"angle-right",
+  eye:"eye",
+  printer:"print",
+  copy:"copy",
+  image:"picture",
+  building:"building",
+  person:"user",
+  sun:"sun",
+  moon:"moon",
+  close:"cross",
+  bell:"bell",
+  dollar:"dollar",
+  clock:"time-quarter-to",
+  trendUp:"chart-line-up",
+  trendDown:"chart-line-down",
+  userPlus:"user-add",
+  clipboard:"clipboard-list",
+  calculator:"calculator",
+  send:"paper-plane",
+  download:"download",
+  upload:"upload",
+  minus:"minus",
+  calendar:"calendar",
+  target:"bullseye",
+  document:"document",
+  wallet:"wallet",
+  package:"box"
+});
 function icon(name, size){
-  size = size||18;
-  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" style="vertical-align:middle">${ICON_PATHS[name]||''}</svg>`;
+  const px=Math.max(10,Math.min(48,Number(size)||18));
+  const mapped=UI_SOLID_ROUNDED[name];
+  const svg=`<svg class="df-icon-svg" viewBox="0 0 24 24" width="${px}" height="${px}" fill="currentColor" aria-hidden="true">${ICON_PATHS[name]||ICON_PATHS.document}</svg>`;
+  return `<span class="df-icon${mapped?" has-flaticon":""}" aria-hidden="true" style="--icon-size:${px}px">`+
+    (mapped?`<i class="fi fi-sr-${mapped}" aria-hidden="true"></i>`:"")+svg+`</span>`;
+}
+/* If a requested Flaticon icon name is absent in the loaded pack, keep the
+   built-in SVG visible instead of leaving an empty spot in the interface. */
+function verifyFlaticonIcons(){
+  if(!document.documentElement.classList.contains("uicons-ready"))return;
+  document.querySelectorAll(".df-icon.has-flaticon").forEach(node=>{
+    const elem=node.querySelector(".fi");
+    if(!elem)return;
+    const content=window.getComputedStyle(elem,"::before").content;
+    const missing=!content||content==="normal"||content==="none"||content==='""'||content==="''";
+    node.classList.toggle("icon-fallback",missing);
+  });
 }
 
 /* ===================== STATIC DATA ===================== */
@@ -464,6 +533,8 @@ function setSyncState(state){
   syncState=state;
   const el=document.getElementById("sidebarSyncStatus");
   if(el)el.outerHTML=sidebarSyncStatusHtml();
+  const top=document.getElementById("topbarSyncStatus");
+  if(top)top.innerHTML=topbarSyncStatusHtml();
 }
 function sidebarSyncStatusHtml(){
   if(!currentUser)return '<div id="sidebarSyncStatus"><span class="sync-dot"></span> غير مسجل دخول</div>';
@@ -663,6 +734,8 @@ function render(){
   else if(ST.screen==="admin") app.innerHTML = renderAdmin();
   else if(ST.screen==="publicInvoice") app.innerHTML = renderPublicInvoice(ST.publicInvoiceData);
   renderModal();
+  if(document.documentElement.classList.contains("uicons-ready"))
+    requestAnimationFrame(verifyFlaticonIcons);
 }
 function renderModal(){
   const root = document.getElementById("modalRoot");
@@ -678,10 +751,12 @@ function renderLanding(){
   return `
   <div class="landing-wrap"><div class="landing-box">
     <div class="logo-circle">${icon("palette",30)}</div>
-    <h1 style="margin:0 0 6px;font-size:24px;">مرحباً</h1>
-    <p class="muted small" style="margin-bottom:24px;">اختر كيف تريد استخدام التطبيق</p>
+    <div class="df-eyebrow" style="margin-bottom:8px">DESIGNERFLOW · WORKSPACE</div>
+    <h1 style="margin:0 0 6px;font-size:26px;font-weight:750;">أهلاً بك في مساحة عملك</h1>
+    <p class="muted small" style="margin-bottom:24px;">مشاريعك، عملاؤك وفواتيرك في مكان واحد.</p>
     <button class="option-btn" onclick="App.goClient()"><span class="icon-box" style="width:42px;height:42px;background:var(--accent);color:#fff;">${icon("clipboard",20)}</span><span><span class="bold" style="display:block;">تعبئة طلب مشروع</span><span class="muted small">للعملاء — استبيان سريع</span></span></button>
-    <button class="option-btn" onclick="App.goLogin()"><span class="icon-box" style="width:42px;height:42px;background:var(--amberBg);color:var(--amber);">${icon("lock",20)}</span><span><span class="bold" style="display:block;">دخول لوحة التحكم</span><span class="muted small">محمية بكلمة سر</span></span></button>
+    <button class="option-btn" onclick="App.goLogin()"><span class="icon-box" style="width:42px;height:42px;background:var(--amberBg);color:var(--amber);">${icon("lock",20)}</span><span><span class="bold" style="display:block;">دخول لوحة التحكم</span><span class="muted small">حساب آمن ومزامنة سحابية</span></span></button>
+    <div style="margin-top:24px;font-size:10px;color:var(--muted);">Uicons by <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">Flaticon</a></div>
   </div></div>`;
 }
 function renderLogin(){
@@ -689,7 +764,8 @@ function renderLogin(){
   return `
   <div class="landing-wrap"><div class="card" style="max-width:380px;width:100%;text-align:right;">
     <div class="logo-circle" style="background:var(--amberBg);color:var(--amber);">${icon("lock",26)}</div>
-    <h2 style="margin:0 0 4px;">${cloudMode? "دخول لوحة التحكم":"أدخل كلمة السر"}</h2>
+    <div class="df-eyebrow" style="text-align:center;margin:0 0 10px">DESIGNERFLOW</div>
+    <h2 style="margin:0 0 4px;text-align:center;">${cloudMode? "دخول مساحة العمل":"أدخل كلمة السر"}</h2>
     <p class="muted small" style="margin-bottom:18px;">${cloudMode? "سجّل الدخول بالحساب نفسه على أجهزتك.":"للدخول إلى لوحة التحكم الخاصة بك."}</p>
     ${cloudMode? `
     <div class="field">
@@ -706,6 +782,7 @@ function renderLogin(){
     <button class="btn btn-soft" style="width:100%;margin-top:8px;justify-content:center;" onclick="App.createAccount()">إنشاء حساب جديد</button>
     <button class="btn btn-soft" style="width:100%;margin-top:8px;justify-content:center;" onclick="App.resetPassword()">نسيت كلمة المرور؟</button>
     <button class="btn btn-soft" style="width:100%;margin-top:8px;justify-content:center;" onclick="App.goLanding()">رجوع</button>
+    <div style="text-align:center;margin-top:20px;font-size:10px;color:var(--muted)">Uicons by <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">Flaticon</a></div>
     ${!cloudMode? `<p class="small muted" style="margin-top:14px;">⚠️ التخزين السحابي غير مُفعّل بعد على هذا الملف (راجع README لإضافة بيانات Firebase). البيانات الآن تُخزَّن في هذا المتصفح فقط.</p>`:``}
   </div></div>`;
 }
@@ -788,7 +865,7 @@ function renderAdmin(){
       <div class="brand-header">
         <div class="brand-logo">${icon('palette',20)}</div>
         <div class="brand-text">
-          <div class="bold">لوحة المصمم</div>
+          <div class="bold">DesignerFlow</div>
           ${sidebarSyncStatusHtml()}
         </div>
       </div>
@@ -817,10 +894,35 @@ function renderAdmin(){
       </div>
       <div>
         <button class="navbtn" style="background:var(--greenBg);color:var(--accent2);" onclick="App.goClient()">${icon('link',18)} <span class="navlabel">فتح كنموذج للعميل</span></button>
-        <button class="navbtn" onclick="App.lock()">${icon('logout',18)} <span class="navlabel">قفل اللوحة</span></button>
+        <button class="navbtn" onclick="App.lock()">${icon('logout',18)} <span class="navlabel">تسجيل الخروج</span></button>
+        <div style="padding:14px 10px 2px;font-size:10px;color:var(--muted);">
+          Uicons by <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener noreferrer" style="color:var(--muted);text-decoration:underline;">Flaticon</a>
+        </div>
       </div>
     </aside>
     <main class="main">
+      <header class="df-topbar">
+        <div class="df-topbar-context">
+          <div>
+            <span class="df-topbar-breadcrumb">DESIGNERFLOW / WORKSPACE</span>
+            <span class="df-topbar-heading">${({dashboard:"لوحة التحكم",work:"المشاريع",clients:"العملاء",invoices:"الفواتير",contracts:"العقود",expenses:"المصاريف",subscriptions:"الاشتراكات",responses:"الطلبات",waitlist:"قائمة الانتظار",goals:"الأهداف",settings:"الإعدادات"})[ST.adminPage]||"مساحة العمل"}</span>
+          </div>
+        </div>
+        <div class="df-topbar-actions">
+          <span id="topbarSyncStatus">${topbarSyncStatusHtml()}</span>
+          <button class="df-topbar-search" type="button" onclick="App.setAdminPage('dashboard');document.getElementById('globalSearch')?.focus()" aria-label="بحث سريع">
+            ${icon('search',15)} <span class="df-search-label">بحث سريع</span><kbd>/</kbd>
+          </button>
+          <details class="df-create-dropdown">
+            <summary class="btn btn-primary" aria-label="إنشاء عنصر جديد">${icon("plus",15)} إنشاء جديد</summary>
+            <div class="df-create-menu">
+              <button type="button" onclick="App.openBatchMetaModal()">${icon("palette",16)} مشروع جديد</button>
+              <button type="button" onclick="App.openClientModal()">${icon("users",16)} عميل جديد</button>
+              <button type="button" onclick="App.openInvoiceModal()">${icon("receipt",16)} فاتورة جديدة</button>
+            </div>
+          </details>
+        </div>
+      </header>
       <div class="main-inner">
       ${backupBanner()}
       ${renderAdminPage(stats)}
@@ -836,6 +938,11 @@ function backupBanner(){
     <span class="flex gap center small">${icon(done?'check':'bell',16)} ${done? "تم تصدير نسخة يدوية اليوم" : "احفظ نسخة احتياطية يدوية دورياً"}</span>
     <button class="btn btn-soft small" onclick="App.exportBackup()">${icon('download',13)} نسخة الآن</button>
   </div>`;
+}
+function topbarSyncStatusHtml(){
+  const state=currentUser?(syncState==="online"?"online":syncState==="syncing"?"syncing":syncState==="error"?"error":"offline"):"offline";
+  const label=state==="online"?"متزامن":state==="syncing"?"جارِ الحفظ":state==="error"?"خطأ في المزامنة":"غير متصل";
+  return `<span class="df-sync-chip ${state}"><span class="sync-dot"></span>${label}</span>`;
 }
 function navBtn(page, iconName, label, badge){
   return `<button class="navbtn ${ST.adminPage===page?'active':''}" onclick="App.setAdminPage('${page}')">${icon(iconName,18)} <span class="navlabel">${label}</span>${badge?`<span class="nav-badge">${badge}</span>`:""}</button>`;
@@ -858,7 +965,14 @@ function renderAdminPage(stats){
 function pageDashboard(stats){
   const recentBatches = DB.batches.slice(-5).reverse();
   return `
-  <h1 class="page-title">نظرة سريعة</h1>
+  <section class="df-hero">
+    <div class="df-hero-copy">
+      <div class="df-eyebrow">DESIGNER WORKSPACE</div>
+      <h1>كل أعمالك، بصورة أوضح.</h1>
+      <p>راقب المشاريع والمدفوعات، وابدأ مهمتك التالية من مساحة واحدة منظمة.</p>
+    </div>
+    <div class="df-hero-orbit" aria-hidden="true">${icon("palette",40)}</div>
+  </section>
   ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
     <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للعرض فقط. لا يمكن تعديل البيانات قبل إعادة الاتصال. يمكنك تنزيل نسخة JSON للحفظ.</div></div>
     <button class="btn btn-soft" onclick="App.exportBackup()">حفظ نسخة JSON</button>
@@ -897,7 +1011,7 @@ function emptyState(iconName, text, ctaLabel, ctaOnclick){
   </div>`;
 }
 function statCard(iconName,label,value,bg,color){
-  return `<div class="card"><div class="icon-box" style="width:40px;height:40px;background:${bg};color:${color};margin-bottom:10px;">${icon(iconName,20)}</div><div style="font-size:21px;font-weight:bold;">${value}</div><div class="muted small" style="margin-top:4px;">${label}</div></div>`;
+  return `<div class="card df-kpi"><div class="icon-box" style="background:${bg};color:${color};">${icon(iconName,19)}</div><div class="df-kpi-value">${value}</div><div class="df-kpi-label">${label}</div></div>`;
 }
 
 /* ---------- DESIGN WORKS ---------- */
@@ -2170,6 +2284,20 @@ function routeFromUrl(){
   }catch(e){ /* ignore malformed url */ }
 }
 
+/* ===================== KEYBOARD NAVIGATION ===================== */
+document.addEventListener("keydown",e=>{
+  const tag=e.target?.tagName||"";
+  const typing=["INPUT","TEXTAREA","SELECT"].includes(tag)||e.target?.isContentEditable;
+  if(e.key==="/"&&!typing&&!e.altKey&&!e.metaKey&&!e.ctrlKey&&ST.screen==="admin"){
+    e.preventDefault();
+    App.setAdminPage("dashboard");
+    document.getElementById("globalSearch")?.focus();
+  }
+  if(e.key==="Escape"){
+    if(ST.modal){App.closeModal();return;}
+    document.body.classList.remove("nav-open");
+  }
+});
 /* ===================== INIT ===================== */
 initTheme();
 initPWA();
