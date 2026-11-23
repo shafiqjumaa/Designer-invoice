@@ -262,7 +262,10 @@ const THEME_KEY = "designerAppTheme";
 function uid(){return Math.random().toString(36).slice(2,10);}
 function fmt(n){n=Number(n)||0; return n.toLocaleString("en-US",{maximumFractionDigits:2});}
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function todayStr(){return new Date().toISOString().slice(0,10);}
+function todayStr(){
+  const d=new Date();
+  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+}
 function monthKey(d){ d=d?new Date(d):new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 
 function defaultDB(){
@@ -547,7 +550,10 @@ function itemPaidTotal(it){
   if(it.pricingMode==="detailed") return (it.components||[]).reduce((s,c)=>s+(c.paid?Number(c.qty||0)*Number(c.price||0):0),0);
   return it.paid? itemTotal(it):0;
 }
-function itemRealTotal(it){ return Number(it.realValue||0); }
+function itemRealTotal(it){
+  const cost=Number(it.realValue||0);
+  return it.pricingMode==="detailed"?cost:cost*Number(it.qty||1);
+}
 
 function invoiceTotal(inv){
   return (inv.items||[]).reduce((sum,it)=>sum+Number(it.qty||0)*Number(it.price||0),0);
@@ -1316,7 +1322,7 @@ function modalBatchMeta(){
 function modalItem(){
   const it = ST.modal.data;
   const detailed = it.pricingMode==="detailed";
-  const total = itemTotal(it); const diff = total-Number(it.realValue||0);
+  const total = itemTotal(it); const diff = total-itemRealTotal(it);
   return `<div class="modal-overlay" onclick="if(event.target===this) App.closeModal()">
   <div class="modal-box wide">
     <div class="modal-head"><h2>تفاصيل عمل التصميم</h2><button class="close-x" onclick="App.closeModal()">${icon('close',18)}</button></div>
@@ -1362,7 +1368,7 @@ function componentsRowsHtml(components){
   </div>`).join("");
 }
 function itemSummaryText(it){
-  const total = itemTotal(it); const paid = itemPaidTotal(it); const diff = total-Number(it.realValue||0);
+  const total = itemTotal(it); const paid = itemPaidTotal(it); const diff = total-itemRealTotal(it);
   return `الإجمالي: $${fmt(total)} · المدفوع: $${fmt(paid)} · المتبقي: $${fmt(total-paid)} · الربح: ${diff>=0?'+':'-'}$${fmt(Math.abs(diff))}`;
 }
 
