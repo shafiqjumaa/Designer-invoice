@@ -259,7 +259,11 @@ const PRIORITIES = ["عالية","متوسطة","منخفضة"];
 const STORAGE_KEY = "designerAppDB_v3";
 const THEME_KEY = "designerAppTheme";
 
-function uid(){return Math.random().toString(36).slice(2,10);}
+function uid(){
+  return (typeof crypto!=="undefined"&&crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
+}
 function fmt(n){n=Number(n)||0; return n.toLocaleString("en-US",{maximumFractionDigits:2});}
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function todayStr(){
@@ -848,6 +852,11 @@ function pageDashboard(stats){
     ${statCard("wallet","صافي الإيرادات بعد المصاريف","$"+fmt(stats.netProfit),"var(--greenBg)","var(--accent2)")}
     ${statCard("bell","تنبيهات", stats.alerts.length,"var(--roseBg)","var(--rose)")}
   </div>
+  ${(()=>{const counts={};DB.invoices.forEach(i=>counts[i.number]=(counts[i.number]||0)+1);const duplicates=Object.keys(counts).filter(number=>counts[number]>1);
+  return duplicates.length?`<div class="banner" style="background:var(--amberBg);border:1px solid var(--amber)">
+    <span class="small">${icon("bell",15)} يوجد ${duplicates.length} رقم فاتورة مكرر في البيانات القديمة. احتساب الإيرادات يشمل كل السجلات حتى تراجعها وتصححها؛ لم تُحذف أي فاتورة تلقائياً.</span>
+    <button class="btn btn-soft" onclick="App.setAdminPage('invoices')">مراجعة الفواتير</button>
+  </div>`:"";})()}
   <div class="card" style="margin-bottom:18px;">
     <label class="lbl" for="globalSearch">بحث سريع في المشاريع والعملاء والفواتير</label>
     <input type="search" id="globalSearch" placeholder="ابحث بالاسم أو رقم الفاتورة..." oninput="App.searchGlobal(this.value)" autocomplete="off">
