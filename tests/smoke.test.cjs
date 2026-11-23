@@ -93,3 +93,20 @@ test('mobile menu has an operable control and visual navigation labels',()=>{
   assert.match(html,/\.nav-open \.sidebar/);
   assert.match(script,/toggleMobileNav\(\)/);
 });
+
+
+test('auth and cloud requests have deadlines and visible loading UI',()=>{
+  assert.match(script,/withDeadline\(fbAuth\.signInWithEmailAndPassword\(email,pass\),18000,"auth\/timeout"\)/);
+  assert.match(script,/withDeadline\(loadCloudDBOnce\(uid\),15000,"cloud\/timeout"\)/);
+  assert.match(script,/ST\.cloudLoading=true/);
+  assert.match(script,/if\(ST\.cloudLoading\)return/);
+  assert.match(script,/ST\.cloudLoading=false/);
+  assert.match(script,/render\(\); \/\/ Avoid leaving the login button stuck/);
+  assert.match(script,/ST\.pinShow=false/);
+});
+test('deadline rejects hung calls and resolves responsive calls',async()=>{
+  const fragment=script.slice(script.indexOf('async function withDeadline('),script.indexOf('function userLocalKey('));
+  const withDeadline=new Function(fragment+';return withDeadline;')();
+  assert.equal(await withDeadline(Promise.resolve('ok'),20,'timeout'),'ok');
+  await assert.rejects(withDeadline(new Promise(()=>{}),10,'auth/timeout'),e=>e.code==='auth/timeout');
+});
