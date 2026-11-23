@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each authenticated owner can access only their own app sections.
+    match /users/{uid}/appdata/{section} {
+      allow read: if request.auth != null
+        && request.auth.uid == uid
+        && section in [
+          'clients', 'batches', 'responses', 'invoices',
+          'expenses', 'subscriptions', 'waitlist', 'contracts',
+          'goals', 'settings'
+        ];
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && section in [
+          'clients', 'batches', 'responses', 'invoices',
+          'expenses', 'subscriptions', 'waitlist', 'contracts',
+          'goals', 'settings'
+        ]
+        && request.resource.data.keys().hasOnly(['value','updatedAt'])
+        && request.resource.data.keys().hasAll(['value','updatedAt']);
+      allow delete: if false;
+    }
+  }
+}

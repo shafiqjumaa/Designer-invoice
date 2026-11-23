@@ -1,7 +1,6 @@
-/* Service Worker بسيط: يخزّن ملفات الواجهة (index.html + الأيقونات) لتفتح
-   حتى بدون إنترنت. بيانات التطبيق نفسها (العملاء/الفواتير...) تُدار بالكامل
-   عبر Firestore الذي له نظام تخزين مؤقت ومزامنة خاص به منفصل عن هذا الملف. */
-const CACHE_NAME = "designerflow-shell-v3";
+/* DesignerFlow v4: application-shell cache only; user financial data stays
+   in Firestore and account-scoped browser storage, never the shell cache. */
+const CACHE_NAME = "designerflow-shell-v4";
 const SHELL_FILES = [
   "./",
   "./index.html",
@@ -10,34 +9,33 @@ const SHELL_FILES = [
   "./icons/icon-512.png"
 ];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(()=>{})
-  );
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_FILES)));
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(key => key.startsWith("designerflow-shell-") && key !== CACHE_NAME)
+      .map(key => caches.delete(key)))));
   self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  // لا نتدخل إطلاقاً في طلبات غير GET أو الطلبات لخوادم خارجية (Firebase/Firestore/Google...)
-  if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
-
+self.addEventListener("fetch", event => {
+  const req=event.request;
+  if(req.method!=="GET" || new URL(req.url).origin!==self.location.origin)return;
   event.respondWith(
-    fetch(req)
-      .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(()=>{});
-        return res;
-      })
-      .catch(() => caches.match(req).then((cached) => cached || caches.match("./index.html")))
+    fetch(req).then(response=>{
+      if(response.ok){
+        const copy=response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put(req,copy)));
+      }
+      return response;
+    }).catch(async()=>{
+      const cached=await caches.match(req);
+      if(cached)return cached;
+      if(req.mode==="navigate")return caches.match("./index.html");
+      return Response.error();
+    })
   );
 });
