@@ -585,6 +585,21 @@ function calcStats(){
   return {profit,owed,active,alerts,pendingResponses,totalExpenses,netProfit:profit-totalExpenses};
 }
 
+function safeExternalUrl(input){
+  try{const u=new URL(String(input||""));return /^https?:$/.test(u.protocol)?u.href:"";}catch(e){return "";}
+}
+function projectMinutes(b){return (b.timeEntries||[]).reduce((sum,item)=>sum+Number(item.minutes||0),0);}
+function searchResultsHtml(value){
+  const q=String(value||"").trim().toLocaleLowerCase();
+  if(q.length<2)return '<p class="muted small">اكتب حرفين على الأقل لعرض النتائج.</p>';
+  const results=[
+    ...DB.clients.filter(c=>clientDisplayName(c).toLocaleLowerCase().includes(q)).map(c=>({type:"client",id:c.id,name:clientDisplayName(c),meta:"عميل"})),
+    ...DB.batches.filter(b=>(b.title+" "+clientName(b.clientId)).toLocaleLowerCase().includes(q)).map(b=>({type:"batch",id:b.id,name:b.title,meta:"مشروع • "+clientName(b.clientId)})),
+    ...DB.invoices.filter(i=>(i.number+" "+i.clientName).toLocaleLowerCase().includes(q)).map(i=>({type:"invoice",id:i.id,name:i.number,meta:"فاتورة • "+i.clientName}))
+  ].slice(0,12);
+  return results.length?results.map(r=>`<button type="button" class="navbtn" style="border-bottom:1px solid var(--border)" data-kind="${esc(r.type)}" data-id="${esc(r.id)}" onclick="App.jumpSearchResult(this.dataset.kind,this.dataset.id)"><b>${esc(r.name)}</b><span class="muted small">${esc(r.meta)}</span></button>`).join("")
+  :'<p class="muted small">لا توجد نتائج مطابقة.</p>';
+}
 function clientStats(){
   const map = {};
   function ensure(id){ if(!map[id]) map[id]={id, name:clientName(id), agreed:0, real:0, count:0}; return map[id]; }
@@ -825,6 +840,11 @@ function pageDashboard(stats){
     ${statCard("clock","فواتير مرسلة غير مدفوعة","$"+fmt(stats.owed),"var(--amberBg)","var(--amber)")}
     ${statCard("wallet","صافي الإيرادات بعد المصاريف","$"+fmt(stats.netProfit),"var(--greenBg)","var(--accent2)")}
     ${statCard("bell","تنبيهات", stats.alerts.length,"var(--roseBg)","var(--rose)")}
+  </div>
+  <div class="card" style="margin-bottom:18px;">
+    <label class="lbl" for="globalSearch">بحث سريع في المشاريع والعملاء والفواتير</label>
+    <input type="search" id="globalSearch" placeholder="ابحث بالاسم أو رقم الفاتورة..." oninput="App.searchGlobal(this.value)" autocomplete="off">
+    <div id="globalSearchResults" style="margin-top:8px;"></div>
   </div>
   <h2 class="small bold muted" style="margin-bottom:10px;">تنبيهات قريبة</h2>
   <div style="margin-bottom:22px;">
@@ -1670,6 +1690,15 @@ const App = {
   setAdminPage(p){ document.body.classList.remove("nav-open");ST.adminPage=p; ST.openBatchId=null; render(); },
   setWorkFilter(v){ ST.workFilter=v;render(); },
   setInvoiceFilter(v){ ST.invoiceFilter=v;render(); },
+  searchGlobal(value){
+    const el=document.getElementById("globalSearchResults");
+    if(el)el.innerHTML=searchResultsHtml(value);
+  },
+  jumpSearchResult(kind,id){
+    if(kind==="client"){App.setAdminPage("clients");App.openClientModal(id);}
+    else if(kind==="batch"){App.setAdminPage("work");App.openBatch(id);}
+    else if(kind==="invoice"){App.setAdminPage("invoices");App.viewInvoice(id);}
+  },
   openBatch(id){ ST.openBatchId=id; render(); },
   backToWorks(){ ST.openBatchId=null; render(); },
   calNav(dir){ ST.calMonth += dir; if(ST.calMonth>11){ST.calMonth=0;ST.calYear++;} if(ST.calMonth<0){ST.calMonth=11;ST.calYear--;} render(); },
