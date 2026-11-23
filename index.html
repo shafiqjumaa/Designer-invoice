@@ -1500,12 +1500,12 @@ function modalItem(){
 }
 function componentsRowsHtml(components){
   return components.map(c=>`<div class="comp-grid">
-    <input value="${esc(c.name)}" placeholder="اسم البند" oninput="App.compUpdate('${c.id}','name',this.value)">
-    <input type="number" value="${c.qty}" oninput="App.compUpdate('${c.id}','qty',this.value,true)">
-    <input type="number" inputmode="decimal" value="${c.price}" oninput="App.compUpdate('${c.id}','price',this.value,true)">
-    <select onchange="App.compUpdate('${c.id}','status',this.value)">${COMP_STATUSES.map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join("")}</select>
-    <button class="btn-icon ${c.paid?'btn-success':'btn-soft'}" title="مدفوع؟" onclick="App.compTogglePaid('${c.id}')">${icon('check',13)}</button>
-    <button class="btn-icon btn-danger" onclick="App.removeComponent('${c.id}')">${icon('trash',13)}</button>
+    <label class="df-component-field" data-type="name"><span class="df-component-label">اسم البند</span><input value="${esc(c.name)}" placeholder="اسم البند" oninput="App.compUpdate('${c.id}','name',this.value)"></label>
+    <label class="df-component-field" data-type="qty"><span class="df-component-label">الكمية</span><input type="number" min="0" value="${c.qty}" oninput="App.compUpdate('${c.id}','qty',this.value,true)"></label>
+    <label class="df-component-field" data-type="price"><span class="df-component-label">السعر</span><input type="number" inputmode="decimal" min="0" value="${c.price}" oninput="App.compUpdate('${c.id}','price',this.value,true)"></label>
+    <label class="df-component-field" data-type="status"><span class="df-component-label">حالة البند</span><select onchange="App.compUpdate('${c.id}','status',this.value)">${COMP_STATUSES.map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join("")}</select></label>
+    <button class="btn-icon df-comp-action ${c.paid?'btn-success':'btn-soft'}" type="button" title="تغيير حالة الدفع" aria-label="تغيير حالة الدفع" onclick="App.compTogglePaid('${c.id}')">${icon('check',13)}<span class="df-comp-action-text">${c.paid?"مدفوع":"غير مدفوع"}</span></button>
+    <button class="btn-icon df-comp-action btn-danger" type="button" title="حذف البند" aria-label="حذف البند" onclick="App.removeComponent('${c.id}')">${icon('trash',13)}<span class="df-comp-action-text">حذف</span></button>
   </div>`).join("");
 }
 function itemSummaryText(it){
