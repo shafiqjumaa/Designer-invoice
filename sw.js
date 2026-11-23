@@ -4,7 +4,7 @@ const CACHE_NAME = "designerflow-shell-v5";
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./assets/orizon-theme.css",
+  "./assets/orizon-theme.css?v=20261123-mobile-v2",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
