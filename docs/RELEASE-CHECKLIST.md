@@ -1,10 +1,10 @@
 # DesignerFlow – staging and security checklist
 
 ## Status
-Development branch only; the live app continues to use `main`.
+Cloud and workflow changes were merged into `main` in November 2026. GitHub-side tests passed; Firebase rules deployment and live account verification remain unconfirmed.
 Firebase project remains as configured in `index.html`. There is no backend for anonymous submissions.
 
-## Before merging
+## Production verification to complete after merging
 1. Preserve a private JSON backup of the existing account (do not upload it to public GitHub).
 2. Verify that Firebase Authentication Email/Password is enabled and that the Firestore Rules tab uses secure owner-only rules.
 3. **Manually publish** `firestore.rules` to the matching Firebase project. Committing the file does **not** deploy rules.
@@ -27,4 +27,4 @@ Firebase project remains as configured in `index.html`. There is no backend for 
 A previously tracked JSON backup containing customer data was removed from the main and development branch tips. Old commits may still expose it; deleting a file does not erase history. A separate controlled history rewrite (with collaborators warned and tokens/credentials reviewed) is required to remove it from history. Do not upload any further client exports into Git.
 
 ## Rollback
-Leave the live `main` branch unchanged until manual checks pass. If test checks fail, do not merge the PR. Restore the prior commit only after preserving newly entered cloud data and accounting for schema changes.
+The code is now on `main`. If live tests fail, preserve any new cloud records, then revert the GitHub merge commit and investigate before changing schemas or user data. Do not delete collections to fix a failed login.
