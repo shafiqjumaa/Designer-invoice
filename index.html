@@ -904,6 +904,8 @@ function pageBatchDetail(){
   const remaining = total-paid;
   const real = (b.items||[]).reduce((s,it)=>s+itemRealTotal(it),0);
   const profitVal = total-real;
+  const minutes=projectMinutes(b);
+  const projectLink=safeExternalUrl(b.driveLink);
   return `
   <button class="btn btn-soft small" onclick="App.backToWorks()" style="margin-bottom:14px;">${icon('chevronLeft',14)} رجوع لأعمال التصميم</button>
   <div class="page-header">
@@ -922,6 +924,20 @@ function pageBatchDetail(){
     ${statCard("check","المدفوع","$"+fmt(paid),"var(--greenBg)","var(--accent2)")}
     ${statCard("clock","المتبقي","$"+fmt(remaining),"var(--amberBg)","var(--amber)")}
     ${statCard("trendUp","الربح (مقابل القيمة الحقيقية)","$"+fmt(profitVal),profitVal>=0?"var(--greenBg)":"var(--roseBg)",profitVal>=0?"var(--green)":"var(--rose)")}
+  </div>
+  <div class="card" style="margin-bottom:18px;">
+    <div class="flex between wrap gap center">
+      <div>
+        <div class="bold small">تتبع وقت تنفيذ المشروع</div>
+        <div class="muted small">الوقت: ${fmt(minutes/60)} ساعة ${Number(b.hourlyRate)>0?`· تكلفة الوقت: ${fmt(minutes/60*Number(b.hourlyRate))}`:""}</div>
+      </div>
+      ${b.timerStartedAt?
+        `<button class="btn btn-success" onclick="App.stopBatchTimer('${b.id}')">${icon("check",14)} إيقاف وحفظ</button>`:
+        `<button class="btn btn-soft" onclick="App.startBatchTimer('${b.id}')">${icon("clock",14)} بدء المؤقت</button>`}
+    </div>
+    ${b.timerStartedAt?`<p class="small muted">بدأ الساعة: ${new Date(b.timerStartedAt).toLocaleString("ar")}</p>`:""}
+    ${projectLink?`<a class="btn btn-soft small" href="${esc(projectLink)}" target="_blank" rel="noopener noreferrer" style="margin-top:12px">${icon("link",14)} فتح ملفات المشروع</a>`:""}
+    ${b.notes?`<p class="small muted" style="margin:12px 0 0">${esc(b.notes)}</p>`:""}
   </div>
   <h2 class="small bold muted" style="margin-bottom:10px;">قائمة الأعمال</h2>
   ${(b.items||[]).length===0? emptyState("clipboard","لا يوجد أعمال مضافة بعد. اضغط + بالأسفل لإضافة أول عمل.") :
@@ -1289,6 +1305,9 @@ function modalBatchMeta(){
       <div class="field"><label class="lbl">تاريخ النهاية</label><input type="date" value="${b.endDate||''}" oninput="App.modalUpdateSilent('endDate', this.value)"></div>
     </div>
     <div class="field"><label class="lbl">الحالة</label><div><button class="chip ${b.status==='مفتوح'?'active':''}" onclick="App.modalUpdate('status','مفتوح')">مفتوح</button><button class="chip ${b.status==='منتهي'?'active':''}" onclick="App.modalUpdate('status','منتهي')">منتهي</button></div></div>
+    <div class="field"><label class="lbl">رابط ملفات المشروع (Google Drive أو غيره)</label><input type="url" placeholder="https://..." value="${esc(b.driveLink||"")}" oninput="App.modalUpdateSilent('driveLink',this.value)"></div>
+    <div class="field"><label class="lbl">تكلفة ساعة العمل بالدولار (اختياري)</label><input type="number" inputmode="decimal" step="0.5" min="0" value="${Number(b.hourlyRate||0)}" oninput="App.modalUpdateSilent('hourlyRate',this.value,true)"></div>
+    <div class="field"><label class="lbl">ملاحظات المشروع</label><textarea rows="2" oninput="App.modalUpdateSilent('notes',this.value)">${esc(b.notes||"")}</textarea></div>
     <button class="btn btn-primary" style="width:100%;padding:13px;justify-content:center;" onclick="App.saveBatchMeta()">حفظ</button>
   </div></div>`;
 }
@@ -1699,7 +1718,20 @@ const App = {
     else if(kind==="batch"){App.setAdminPage("work");App.openBatch(id);}
     else if(kind==="invoice"){App.setAdminPage("invoices");App.viewInvoice(id);}
   },
-  openBatch(id){ ST.openBatchId=id; render(); },
+  openBatch(id){ST.openBatchId=id;render();},
+  startBatchTimer(id){
+    const b=DB.batches.find(x=>x.id===id);if(!b||b.timerStartedAt)return;
+    if(DB.batches.some(x=>x.id!==id&&x.timerStartedAt))return alert("أوقف مؤقت المشروع الآخر أولاً.");
+    b.timerStartedAt=Date.now();saveDB();render();
+  },
+  stopBatchTimer(id){
+    const b=DB.batches.find(x=>x.id===id);if(!b||!b.timerStartedAt)return;
+    const endedAt=Date.now();
+    const minutes=Math.max(1,Math.ceil((endedAt-b.timerStartedAt)/60000));
+    b.timeEntries=b.timeEntries||[];
+    b.timeEntries.push({id:uid(),startedAt:b.timerStartedAt,endedAt,minutes});
+    b.timerStartedAt=null;saveDB();render();
+  },
   backToWorks(){ ST.openBatchId=null; render(); },
   calNav(dir){ ST.calMonth += dir; if(ST.calMonth>11){ST.calMonth=0;ST.calYear++;} if(ST.calMonth<0){ST.calMonth=11;ST.calYear--;} render(); },
 
@@ -1779,7 +1811,7 @@ const App = {
   openBatchMetaModal(id, prefill){
     let data;
     if(id){ data=Object.assign({}, DB.batches.find(b=>b.id===id)); }
-    else { data=Object.assign({id:uid(), title:`مجموعة أعمال ${DB.batches.length+1}`, clientId:"", status:"مفتوح", startDate:todayStr(), endDate:"", items:[]}, prefill); }
+    else { data=Object.assign({id:uid(), title:`مجموعة أعمال ${DB.batches.length+1}`, clientId:"", status:"مفتوح", startDate:todayStr(), endDate:"", items:[],timeEntries:[],timerStartedAt:null,driveLink:"",hourlyRate:0,notes:""}, prefill); }
     ST.modal={type:"batchMeta", data}; renderModal();
   },
   saveBatchMeta(){
