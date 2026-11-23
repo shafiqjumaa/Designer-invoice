@@ -226,7 +226,6 @@ const LOGO_TYPES = [
 const EXPENSE_CATEGORIES = ["اشتراكات","أدوات","ملفات","تسويق","أخرى"];
 const COMP_STATUSES = ["لم يبدأ","قيد التنفيذ","مكتمل"];
 const PRIORITIES = ["عالية","متوسطة","منخفضة"];
-const PASSWORD = "Reem";
 const STORAGE_KEY = "designerAppDB_v3";
 const THEME_KEY = "designerAppTheme";
 
@@ -242,20 +241,12 @@ function defaultDB(){
     goals:{}, settings:{businessName:"",businessContact:"",businessWebsite:"",businessWhatsapp:"",paymentNote:"",lastBackupDate:"",backupHistory:[]}
   };
 }
-/* =====================================================================
-   التخزين السحابي (Firebase Firestore) + نسخة محلية احتياطية
-   -----------------------------------------------------------------
-   - كل بيانات التطبيق (DB) تُقسَّم إلى "أجزاء" بعدد مفاتيح defaultDB()
-     (clients, batches, invoices ...) ويُخزَّن كل جزء في مستند مستقل
-     داخل: users/{uid}/appdata/{key}
-   - عند كل استدعاء saveDB(): تُحفظ نسخة فورية في localStorage (حماية
-     من ضياع البيانات حتى لو انقطع الإنترنت لحظة الحفظ)، ثم تُرسَل
-     نفس البيانات إلى Firestore. مكتبة Firestore نفسها تتولى تخزين
-     الطلبات في طابور محلي وإرسالها تلقائياً عند رجوع الاتصال
-     (enablePersistence) — وهذا ما يحقق طلب "المزامنة بعد الانقطاع".
-   ===================================================================== */
-
-// !!! عدّل القيم التالية بمعلومات مشروع Firebase الخاص بك (راجع README) !!!
+/* ================ CLOUD SYNC v2 — USER ISOLATED ===================
+   Keep the existing Firestore path to preserve deployed customer data.
+   Save only changed sections instead of rewriting the whole database.
+   Pending changes are cached under each authenticated user's UID.
+   A future migration will normalize individual records for multi-editor use.
+================================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyDRvTM9nlvpEUI0D8SO_Hq0rERCf_vezeQ",
   authDomain: "designer-invoice-68d2d.firebaseapp.com",
@@ -266,124 +257,175 @@ const firebaseConfig = {
   measurementId: "G-KR1Z5Y80Q8"
 };
 
+const CLOUD_KEYS = Object.keys(defaultDB());
+const USER_STORAGE_PREFIX = "designerflow_user_v4_";
 let fbApp=null, fbAuth=null, fbDB=null, currentUser=null;
-let cloudReady=false, saveTimer=null, unsubscribers=[], suppressNextSnapshot={};
+let cloudReady=false, saveTimer=null, unsubscribers=[];
+let pendingKeys=new Set(), inFlightKeys=new Set();
+let lastSavedValues={}, writeInProgress=false;
+let syncState="local";
 
 function isFirebaseConfigured(){
-  return firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("PASTE_")!==0;
+  return Boolean(firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("PASTE_"));
 }
-
 function initFirebase(){
-  if(!isFirebaseConfigured()){
-    console.warn("Firebase غير مُهيّأ — التطبيق سيعمل بتخزين محلي فقط (localStorage) إلى أن تضيف بيانات مشروعك في firebaseConfig.");
-    return false;
-  }
+  if(!isFirebaseConfigured())return false;
   try{
-    fbApp = firebase.initializeApp(firebaseConfig);
-    fbAuth = firebase.auth();
-    fbDB = firebase.firestore();
-    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
-    // يسمح بالعمل بدون إنترنت: يخزّن الكتابات محلياً ويرسلها تلقائياً عند رجوع الاتصال
-    fbDB.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* تبويب آخر مفتوح، أو متصفح لا يدعمها — لا مشكلة */ });
+    fbApp=firebase.initializeApp(firebaseConfig);
+    fbAuth=firebase.auth();
+    fbDB=firebase.firestore();
+    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+      .catch(e=>console.warn("Firebase auth persistence",e));
+    fbDB.enablePersistence({synchronizeTabs:true})
+      .catch(e=>console.warn("Firebase offline cache unavailable",e));
     return true;
-  }catch(e){ console.error("Firebase init error", e); return false; }
+  }catch(e){console.error("Firebase initialization failed",e);return false;}
 }
-
-/* نسخة محلية احتياطية فقط (ليست المصدر الأساسي بعد تفعيل السحابة) */
-function loadLocalDB(){
+function userLocalKey(uid){return USER_STORAGE_PREFIX+uid;}
+function loadLocalDB(uid){
+  if(!uid)return defaultDB();
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) return Object.assign(defaultDB(), JSON.parse(raw));
-  }catch(e){}
+    const raw=localStorage.getItem(userLocalKey(uid));
+    if(raw)return Object.assign(defaultDB(),JSON.parse(raw));
+  }catch(e){console.warn("Could not read user cache",e);}
   return defaultDB();
 }
 function saveLocalDB(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
-  catch(e){ console.warn("تعذر حفظ النسخة المحلية", e); }
+  if(!currentUser)return;
+  try{
+    localStorage.setItem(userLocalKey(currentUser.uid),JSON.stringify(DB));
+  }catch(e){console.warn("Local cache could not be saved",e);}
 }
-
-/* يُستدعى من كل مكان في التطبيق تماماً كما كان سابقاً — لا تغيير في بقية الكود */
+function rememberCloudState(){
+  CLOUD_KEYS.forEach(key=>{lastSavedValues[key]=JSON.stringify(DB[key]);});
+}
+function markChangedSections(){
+  CLOUD_KEYS.forEach(key=>{
+    const value=JSON.stringify(DB[key]);
+    if(value!==lastSavedValues[key]){
+      lastSavedValues[key]=value;
+      pendingKeys.add(key);
+    }
+  });
+}
 function saveDB(){
   saveLocalDB();
-  updateSyncBadge();
-  if(!currentUser || !fbDB) return; // غير مسجل دخول بعد / لا يوجد إعداد سحابي -> تبقى النسخة المحلية آمنة
+  if(!currentUser||!fbDB)return;
+  markChangedSections();
+  if(!pendingKeys.size)return;
+  if(!cloudReady){
+    setSyncState("offline");
+    return;
+  }
+  setSyncState(navigator.onLine?"syncing":"offline");
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(pushDBToCloud, 350); // تجميع الحفظات السريعة المتتابعة بطلب واحد
+  saveTimer=setTimeout(pushDBToCloud,400);
 }
-
 function userDocRef(key){
   return fbDB.collection("users").doc(currentUser.uid).collection("appdata").doc(key);
 }
-
 function pushDBToCloud(){
-  if(!currentUser || !fbDB) return;
-  const batch = fbDB.batch();
-  Object.keys(defaultDB()).forEach(key=>{
-    suppressNextSnapshot[key] = true; // لتجاهل الصدى المحلي القادم من نفس الكتابة
-    batch.set(userDocRef(key), { value: DB[key], updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  if(!currentUser||!fbDB||!cloudReady||writeInProgress||!pendingKeys.size)return;
+  const keys=Array.from(pendingKeys);
+  const uid=currentUser.uid;
+  pendingKeys.clear();
+  const batch=fbDB.batch();
+  keys.forEach(key=>{
+    inFlightKeys.add(key);
+    batch.set(userDocRef(key),{
+      value:JSON.parse(JSON.stringify(DB[key])),
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
   });
-  setSyncState("syncing");
-  batch.commit().then(()=>{ setSyncState(navigator.onLine? "online":"offline"); })
-  .catch(e=>{ console.warn("سيُعاد المحاولة عند توفر الاتصال", e); setSyncState("offline"); });
+  writeInProgress=true;
+  setSyncState(navigator.onLine?"syncing":"offline");
+  batch.commit().then(()=>{
+    if(!currentUser||currentUser.uid!==uid)return;
+    keys.forEach(k=>inFlightKeys.delete(k));
+    writeInProgress=false;
+    if(pendingKeys.size)pushDBToCloud();
+    else setSyncState(navigator.onLine?"online":"offline");
+  }).catch(e=>{
+    console.error("Cloud write failed",e);
+    if(!currentUser||currentUser.uid!==uid)return;
+    keys.forEach(k=>{inFlightKeys.delete(k);pendingKeys.add(k);});
+    writeInProgress=false;
+    setSyncState("offline");
+  });
 }
-
-/* يجلب كل الأجزاء من Firestore دفعة واحدة عند أول تسجيل دخول على أي جهاز */
 async function loadCloudDBOnce(uid){
-  const keys = Object.keys(defaultDB());
-  const snaps = await Promise.all(keys.map(k=>fbDB.collection("users").doc(uid).collection("appdata").doc(k).get()));
-  const out = defaultDB();
-  let anyDataFound = false;
-  snaps.forEach((snap,i)=>{ if(snap.exists){ out[keys[i]] = snap.data().value; anyDataFound = true; } });
-  return {data: out, found: anyDataFound};
+  const snaps=await Promise.all(CLOUD_KEYS.map(k=>
+    fbDB.collection("users").doc(uid).collection("appdata").doc(k).get()
+  ));
+  const out=defaultDB();let found=false;
+  snaps.forEach((snap,i)=>{
+    if(snap.exists){out[CLOUD_KEYS[i]]=snap.data().value;found=true;}
+  });
+  return {data:out,found};
 }
-
-/* استماع لحظي: أي تعديل من جهاز آخر ينعكس هنا تلقائياً */
 function attachRealtimeListeners(uid){
   detachRealtimeListeners();
-  Object.keys(defaultDB()).forEach(key=>{
-    const unsub = fbDB.collection("users").doc(uid).collection("appdata").doc(key)
+  CLOUD_KEYS.forEach(key=>{
+    const unsub=fbDB.collection("users").doc(uid).collection("appdata").doc(key)
       .onSnapshot(snap=>{
-        if(suppressNextSnapshot[key]){ suppressNextSnapshot[key]=false; return; } // صدى كتابتنا نحن
-        if(!snap.exists) return;
-        DB[key] = snap.data().value;
-        saveLocalDB();
-        setSyncState(snap.metadata.fromCache? "offline":"online");
-        if(!ST.modal) render(); // لا نُعيد الرسم أثناء تعديل نشط لعدم مقاطعة المستخدم
-      }, err=>console.warn("realtime listener error", err));
+        if(!currentUser||currentUser.uid!==uid||!snap.exists)return;
+        if(snap.metadata.hasPendingWrites||pendingKeys.has(key)||inFlightKeys.has(key))return;
+        const remote=snap.data().value;
+        if(JSON.stringify(DB[key])!==JSON.stringify(remote)){
+          DB[key]=remote;
+          saveLocalDB();
+          if(!ST.modal)render();
+        }
+        lastSavedValues[key]=JSON.stringify(remote);
+        if(!pendingKeys.size&&!writeInProgress)
+          setSyncState(snap.metadata.fromCache?"offline":"online");
+      },e=>{console.error("Realtime sync failed",e);setSyncState("offline");});
     unsubscribers.push(unsub);
   });
 }
-function detachRealtimeListeners(){ unsubscribers.forEach(u=>{try{u();}catch(e){}}); unsubscribers=[]; }
-
+function detachRealtimeListeners(){
+  unsubscribers.forEach(fn=>{try{fn();}catch(e){}});
+  unsubscribers=[];
+}
+function resetCloudSession(){
+  clearTimeout(saveTimer);
+  detachRealtimeListeners();
+  pendingKeys.clear();inFlightKeys.clear();
+  lastSavedValues={};writeInProgress=false;cloudReady=false;
+}
 function authErrorMessage(err){
-  const code = err && err.code;
-  const map = {
-    "auth/wrong-password":"كلمة السر غير صحيحة.",
-    "auth/invalid-email":"صيغة البريد الإلكتروني غير صحيحة.",
-    "auth/weak-password":"كلمة السر ضعيفة جداً — استخدم 6 خانات على الأقل.",
-    "auth/email-already-in-use":"هذا البريد مستخدم بحساب آخر بكلمة سر مختلفة.",
-    "auth/too-many-requests":"محاولات كثيرة خاطئة، حاول بعد قليل.",
-    "auth/network-request-failed":"لا يوجد اتصال بالإنترنت الآن. تحقق من الشبكة وحاول مجدداً.",
-    "auth/invalid-credential":"كلمة السر غير صحيحة.",
+  const code=err&&err.code;
+  const map={
+    "auth/wrong-password":"كلمة المرور غير صحيحة.",
+    "auth/invalid-email":"البريد الإلكتروني غير صحيح.",
+    "auth/weak-password":"اختر كلمة مرور مكوّنة من 6 أحرف على الأقل.",
+    "auth/email-already-in-use":"البريد الإلكتروني مستخدم بالفعل.",
+    "auth/user-not-found":"الحساب غير موجود؛ أنشئ حساباً أولاً.",
+    "auth/too-many-requests":"محاولات كثيرة، حاول لاحقاً.",
+    "auth/network-request-failed":"لا يوجد اتصال بالإنترنت.",
+    "auth/invalid-credential":"بيانات الدخول غير صحيحة.",
     "auth/user-disabled":"هذا الحساب معطّل."
   };
-  return map[code] || ("حدث خطأ: " + (err && err.message ? err.message : "غير معروف"));
+  return map[code]||("فشل تسجيل الدخول: "+(err?.message||"خطأ غير معروف"));
 }
-let syncState = "local"; // local | online | syncing | offline
 function setSyncState(state){
-  syncState = state;
-  const el = document.getElementById("sidebarSyncStatus");
-  if(el){ el.outerHTML = sidebarSyncStatusHtml(); } // تحديث فوري بدون إعادة رسم كل الصفحة (لا يقاطع أي تعديل نشط)
+  syncState=state;
+  const el=document.getElementById("sidebarSyncStatus");
+  if(el)el.outerHTML=sidebarSyncStatusHtml();
 }
 function sidebarSyncStatusHtml(){
-  if(!currentUser) return `<div id="sidebarSyncStatus"><span class="sync-dot" style="background:var(--muted);"></span> وضع محلي (بدون سحابة)</div>`;
-  if(syncState==="syncing") return `<div id="sidebarSyncStatus" class="st-syncing"><span class="sync-dot spin"></span> جارِ الحفظ...</div>`;
-  if(syncState==="offline") return `<div id="sidebarSyncStatus" class="st-offline"><span class="sync-dot"></span> غير متصل — سيُحفظ عند رجوع الإنترنت</div>`;
-  return `<div id="sidebarSyncStatus" class="st-online"><span class="sync-dot"></span> متصل ومتزامن</div>`;
+  if(!currentUser)return '<div id="sidebarSyncStatus"><span class="sync-dot"></span> غير مسجل دخول</div>';
+  if(syncState==="syncing")return '<div id="sidebarSyncStatus" class="st-syncing"><span class="sync-dot spin"></span> جارِ المزامنة...</div>';
+  if(syncState==="offline")return '<div id="sidebarSyncStatus" class="st-offline"><span class="sync-dot"></span> غير متصل / تغييرات بانتظار الحفظ</div>';
+  if(syncState==="online")return '<div id="sidebarSyncStatus" class="st-online"><span class="sync-dot"></span> محفوظ بالسحابة</div>';
+  return '<div id="sidebarSyncStatus"><span class="sync-dot"></span> جارِ التهيئة...</div>';
 }
-function updateSyncBadge(){ setSyncState(navigator.onLine? "online":"offline"); }
-window.addEventListener("online", ()=>{ setSyncState("online"); if(currentUser) pushDBToCloud(); });
-window.addEventListener("offline", ()=>setSyncState("offline"));
+window.addEventListener("online",()=>{
+  if(!currentUser)return;
+  if(pendingKeys.size)pushDBToCloud();
+  else setSyncState(cloudReady?"online":"offline");
+});
+window.addEventListener("offline",()=>{if(currentUser)setSyncState("offline");});
 
 let DB = defaultDB(); // ستُعبّى فعلياً بعد التحقق من تسجيل الدخول (انظر ===== INIT =====)
 
@@ -394,7 +436,7 @@ let ST = {
   surveyDraft: emptySurvey(),
   surveySubmitted: false,
   publicMode: false,
-  lastSurveyWaLink: "",
+  lastSurveyWaLink: "", publicWhatsApp: "",
   modal: null,
   pinInput: "", pinError: "", pinShow:false,
   calMonth: new Date().getMonth(), calYear: new Date().getFullYear(),
@@ -524,15 +566,7 @@ function initPWA(){
 
 /* ===================== AUTO BACKUP (best-effort, only while app is open) ===================== */
 function checkAutoBackup(){
-  const today = todayStr();
-  if(DB.settings.lastBackupDate !== today){
-    const json = JSON.stringify(DB);
-    DB.settings.lastBackupDate = today;
-    DB.settings.backupHistory = DB.settings.backupHistory||[];
-    DB.settings.backupHistory.unshift({date:today, sizeKB:Math.round(json.length/1024)});
-    DB.settings.backupHistory = DB.settings.backupHistory.slice(0,30);
-    saveDB();
-  }
+  // Backup files are downloaded only by explicit user action. Cloud sync is not a versioned backup.
 }
 
 /* ===================== RENDER ROOT ===================== */
@@ -571,7 +605,7 @@ function renderLogin(){
   <div class="landing-wrap"><div class="card" style="max-width:380px;width:100%;text-align:right;">
     <div class="logo-circle" style="background:var(--amberBg);color:var(--amber);">${icon("lock",26)}</div>
     <h2 style="margin:0 0 4px;">${cloudMode? "دخول لوحة التحكم":"أدخل كلمة السر"}</h2>
-    <p class="muted small" style="margin-bottom:18px;">${cloudMode? "نفس البريد وكلمة السر يعملان من أي جهاز — سيتم إنشاء الحساب تلقائياً أول مرة.":"للدخول إلى لوحة التحكم الخاصة بك."}</p>
+    <p class="muted small" style="margin-bottom:18px;">${cloudMode? "سجّل الدخول بالحساب نفسه على أجهزتك.":"للدخول إلى لوحة التحكم الخاصة بك."}</p>
     ${cloudMode? `
     <div class="field">
       <label class="lbl">البريد الإلكتروني</label>
@@ -584,6 +618,8 @@ function renderLogin(){
     <label class="small muted"><input type="checkbox" style="width:auto;" onclick="App.togglePinShow()" ${ST.pinShow?'checked':''}> إظهار كلمة السر</label>
     ${ST.pinError? `<p class="small" style="color:var(--rose);margin:10px 0;">${esc(ST.pinError)}</p>`:""}
     <button class="btn btn-primary" style="width:100%;margin-top:14px;justify-content:center;" onclick="App.tryLogin()" ${ST.authBusy?'disabled':''}>${ST.authBusy? "...جارِ التحقق":"دخول"}</button>
+    <button class="btn btn-soft" style="width:100%;margin-top:8px;justify-content:center;" onclick="App.createAccount()">إنشاء حساب جديد</button>
+    <button class="btn btn-soft" style="width:100%;margin-top:8px;justify-content:center;" onclick="App.resetPassword()">نسيت كلمة المرور؟</button>
     <button class="btn btn-soft" style="width:100%;margin-top:8px;justify-content:center;" onclick="App.goLanding()">رجوع</button>
     ${!cloudMode? `<p class="small muted" style="margin-top:14px;">⚠️ التخزين السحابي غير مُفعّل بعد على هذا الملف (راجع README لإضافة بيانات Firebase). البيانات الآن تُخزَّن في هذا المتصفح فقط.</p>`:``}
   </div></div>`;
@@ -595,7 +631,7 @@ function renderClientForm(){
   if(ST.surveySubmitted){
     return `<div class="landing-wrap"><div class="card" style="max-width:480px;width:100%;text-align:center;">
       <div class="logo-circle" style="background:var(--greenBg);color:var(--green);">${icon("check",28)}</div>
-      <h2>تم استلام طلبك بنجاح</h2><p class="muted">رح نتواصل معك قريباً لمناقشة التفاصيل.</p>
+      <h2>${ST.publicMode?"الطلب جاهز للإرسال":"تم تسجيل الطلب"}</h2><p class="muted">${ST.publicMode?"أكمل إرسال الرسالة في واتساب حتى يصل طلبك.":"تم حفظ الطلب في حساب المصمم."}</p>
       ${ST.lastSurveyWaLink? `<a class="btn btn-success" style="width:100%;justify-content:center;margin-top:10px;" href="${ST.lastSurveyWaLink}" target="_blank">${icon('send',16)} لم يفتح واتساب تلقائياً؟ اضغط هنا</a>` : ""}
     </div></div>`;
   }
@@ -645,7 +681,7 @@ function renderClientForm(){
       ` : `<div class="field"><label class="lbl">تفاصيل الخدمة المطلوبة</label><textarea rows="3" placeholder="اشرح طلبك بالتفصيل..." oninput="App.surveySet('notes', this.value)">${esc(s.notes)}</textarea></div>`}
       <div class="field"><label class="lbl">الميزانية التقريبية</label><div>${BUDGETS.map(b=>`<button class="chip ${s.budget===b[0]?'active':''}" onclick="App.surveySet('budget','${b[0]}')">${b[0]}</button>`).join("")}</div></div>
       ${isIdentity ? `<div class="field"><label class="lbl">تفاصيل إضافية</label><textarea rows="3" oninput="App.surveySet('notes', this.value)">${esc(s.notes)}</textarea></div>` : ""}
-      <button class="btn btn-primary" style="width:100%;padding:13px;justify-content:center;" onclick="App.submitSurvey()">${icon('send',16)} إرسال الطلب</button>
+      <button class="btn btn-primary" style="width:100%;padding:13px;justify-content:center;" onclick="App.submitSurvey()">${icon('send',16)} ${ST.publicMode?"متابعة الإرسال عبر واتساب":"تسجيل الطلب"}</button>
     </div>
   </div></div>`;
 }
@@ -694,7 +730,7 @@ function backupBanner(){
   const today = todayStr();
   const done = DB.settings.lastBackupDate===today;
   return `<div class="banner" style="background:${done?'var(--greenBg)':'var(--amberBg)'};border:1px solid ${done?'var(--green)':'var(--amber)'};">
-    <span class="flex gap center small">${icon(done?'check':'bell',16)} ${done? "تم إنشاء نسخة احتياطية اليوم تلقائياً" : "لم يتم إنشاء نسخة احتياطية اليوم"}</span>
+    <span class="flex gap center small">${icon(done?'check':'bell',16)} ${done? "تم تصدير نسخة يدوية اليوم" : "احفظ نسخة احتياطية يدوية دورياً"}</span>
     <button class="btn btn-soft small" onclick="App.exportBackup()">${icon('download',13)} نسخة الآن</button>
   </div>`;
 }
@@ -1120,7 +1156,7 @@ function pageSettings(){
   </div>
   <div class="card" style="margin-bottom:18px;">
     <h3 style="margin-top:0;">النسخ الاحتياطي</h3>
-    <p class="muted small">يتم إنشاء نسخة تلقائياً (مرة واحدة) كل يوم تفتح فيه التطبيق. للاسترجاع: استخدم "استيراد" مع ملف JSON محفوظ سابقاً.</p>
+    <p class="muted small">المزامنة السحابية ليست نسخة احتياطية مؤرّخة. صدّر ملف JSON واحفظه في مكان خاص. الاستيراد يستبدل البيانات الحالية بعد تأكيدك.</p>
     <div class="flex gap wrap" style="margin-bottom:14px;">
       <button class="btn btn-primary" onclick="App.exportBackup()">${icon('download',16)} تصدير نسخة الآن</button>
       <button class="btn btn-soft" onclick="document.getElementById('importFileInput').click()">${icon('upload',16)} استيراد نسخة</button>
@@ -1488,9 +1524,12 @@ const App = {
   },
   goClient(){ ST.screen="client"; ST.publicMode=false; ST.surveyDraft=emptySurvey(); ST.surveySubmitted=false; render(); },
   lock(){
-    // قفل اللوحة: يسجّل الخروج من الحساب السحابي لحماية بياناتك على هذا الجهاز، والبيانات تبقى محفوظة بالسحابة بالكامل
-    if(isFirebaseConfigured() && fbAuth){ detachRealtimeListeners(); fbAuth.signOut().catch(()=>{}); currentUser=null; }
-    ST.screen="landing"; ST.adminPage="dashboard"; ST.pinInput=""; render();
+    if(isFirebaseConfigured()&&fbAuth){
+      resetCloudSession();
+      fbAuth.signOut().catch(e=>console.warn("Sign out failed",e));
+    }
+    currentUser=null;DB=defaultDB();
+    ST.screen="landing";ST.adminPage="dashboard";ST.pinInput="";render();
   },
   setEmail(v){ ST.pinError=""; ST.emailInput=v; },
   setPin(v){ ST.pinError=""; ST.pinInput=v; },
@@ -1510,11 +1549,25 @@ const App = {
       await fbAuth.signInWithEmailAndPassword(email, pass);
       // بقية الإجراءات (تحميل البيانات، الانتقال للوحة التحكم) تتم في onAuthStateChanged
     }catch(err){
-      if(err && err.code==="auth/user-not-found"){
-        try{ await fbAuth.createUserWithEmailAndPassword(email, pass); }
-        catch(err2){ ST.authBusy=false; ST.pinError=authErrorMessage(err2); render(); return; }
-      } else { ST.authBusy=false; ST.pinError=authErrorMessage(err); render(); return; }
+      ST.authBusy=false; ST.pinError=authErrorMessage(err); render(); return;
     }
+  },
+  async createAccount(){
+    if(!fbAuth)return alert("خدمة الدخول غير جاهزة.");
+    const email=(ST.emailInput||"").trim(),pass=ST.pinInput||"";
+    if(!email||pass.length<6)return alert("أدخل البريد وكلمة مرور لا تقل عن 6 أحرف.");
+    ST.authBusy=true;render();
+    try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
+    catch(e){ST.pinError=authErrorMessage(e);ST.authBusy=false;render();}
+  },
+  async resetPassword(){
+    if(!fbAuth)return alert("خدمة استعادة الحساب غير جاهزة.");
+    const email=(ST.emailInput||"").trim();
+    if(!email)return alert("أدخل بريدك الإلكتروني أولاً.");
+    try{
+      await fbAuth.sendPasswordResetEmail(email);
+      alert("إذا كان البريد مسجلاً، تحقق من صندوق بريدك لاستعادة كلمة المرور.");
+    }catch(e){alert(authErrorMessage(e));}
   },
   setAdminPage(p){ ST.adminPage=p; ST.openBatchId=null; render(); },
   openBatch(id){ ST.openBatchId=id; render(); },
@@ -1525,18 +1578,22 @@ const App = {
   surveySet(field, val){ ST.surveyDraft[field]=val; render(); },
   surveyToggleArr(field, val, max){ const arr=ST.surveyDraft[field]; if(arr.includes(val)) ST.surveyDraft[field]=arr.filter(x=>x!==val); else if(!max||arr.length<max) ST.surveyDraft[field]=[...arr,val]; render(); },
   submitSurvey(){
-    const s=ST.surveyDraft; s.estimatedValue=budgetValue(s.budget);
-    DB.responses.push(Object.assign({},s,{id:uid(),createdAt:Date.now()})); saveDB();
-    ST.surveySubmitted=true;
+    const s=ST.surveyDraft;
+    if(!s.name.trim()||!s.whatsapp.trim())return alert("الاسم ورقم واتساب مطلوبان.");
+    s.estimatedValue=budgetValue(s.budget);
     ST.lastSurveyWaLink="";
     if(ST.publicMode){
-      const num = (DB.settings.businessWhatsapp||"").replace(/[^0-9]/g,"");
-      if(num){
-        const msg = buildSurveyWaMessage(s);
-        const link = `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
-        ST.lastSurveyWaLink = link;
-        try{ window.open(link, "_blank"); }catch(e){}
-      }
+      const num=(ST.publicWhatsApp||"").replace(/[^0-9]/g,"");
+      if(!/^\d{8,16}$/.test(num))
+        return alert("رابط الطلب يحتاج إعادة إرساله من المصمم بعد إعداد رقم واتساب.");
+      const url=`https://wa.me/${num}?text=${encodeURIComponent(buildSurveyWaMessage(s))}`;
+      ST.lastSurveyWaLink=url;
+      ST.surveySubmitted=true;
+      try{window.open(url,"_blank","noopener,noreferrer");}catch(e){}
+    }else{
+      DB.responses.push(Object.assign({},s,{id:uid(),createdAt:Date.now()}));
+      saveDB();
+      ST.surveySubmitted=true;
     }
     render();
   },
@@ -1752,8 +1809,11 @@ const App = {
     App.copyText(url, "تم نسخ رابط الفاتورة، أرسله للعميل مباشرة.");
   },
   copyClientFormLink(){
-    const url = location.origin + location.pathname + "?client=1";
-    App.copyText(url, "تم نسخ رابط استبيان العملاء.");
+    const phone=(DB.settings.businessWhatsapp||"").replace(/[^0-9]/g,"");
+    if(!/^\d{8,16}$/.test(phone))
+      return alert("أدخل رقم واتساب صحيحاً في الإعدادات قبل نسخ رابط الطلب.");
+    const url=location.origin+location.pathname+"?client=1&wa="+encodeURIComponent(phone);
+    App.copyText(url,"تم نسخ رابط الطلب المرتبط برقم واتساب.");
   },
   copyInvoiceText(){
     const inv=ST.modal.data; const total=(inv.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.price||0),0);
@@ -1874,6 +1934,7 @@ function routeFromUrl(){
     if(params.get("client")==="1"){
       ST.screen = "client";
       ST.publicMode = true;
+      ST.publicWhatsApp = (params.get("wa")||"").replace(/[^0-9]/g,"");
       ST.surveyDraft = emptySurvey();
       ST.surveySubmitted = false;
     }
@@ -1884,46 +1945,61 @@ function routeFromUrl(){
 initTheme();
 initPWA();
 routeFromUrl();
-
-// الروابط العامة (استبيان عميل / فاتورة عامة) لا تحتاج تسجيل دخول ولا سحابة — نعرضها فوراً
-const isPublicRoute = (ST.screen==="client" || ST.screen==="publicInvoice");
+const isPublicRoute=(ST.screen==="client"||ST.screen==="publicInvoice");
 if(isPublicRoute){
-  DB = defaultDB(); // مساحة عمل محلية بسيطة لتوليد رسالة واتساب فقط، لا تُقرأ من أي مكان آخر
+  DB=defaultDB();
   render();
-} else if(!initFirebase()){
-  // Firebase غير مُهيّأ بعد على هذا الملف -> نعمل بنفس الأسلوب القديم (localStorage + كلمة سر واحدة)
-  DB = loadLocalDB();
+}else if(!initFirebase()){
+  DB=defaultDB();
+  ST.screen="login";
+  ST.pinError="تعذّر بدء Firebase. البيانات المحفوظة في السحابة لم تُحمّل.";
   render();
-} else {
-  // وضع سحابي: ننتظر معرفة حالة تسجيل الدخول قبل عرض أي شاشة إدارية
-  DB = loadLocalDB(); // نسخة مؤقتة أثناء الفحص لتجنّب أي شاشة فاضية
-  fbAuth.onAuthStateChanged(async (user)=>{
-    currentUser = user;
+}else{
+  DB=defaultDB();
+  fbAuth.onAuthStateChanged(async user=>{
+    resetCloudSession();
+    currentUser=user;
     if(user){
+      const uid=user.uid;
+      ST.screen="admin";
+      setSyncState("syncing");
       try{
-        setSyncState("syncing");
-        const {data, found} = await loadCloudDBOnce(user.uid);
-        if(found){
-          DB = data; saveLocalDB();
-        } else {
-          // أول تسجيل دخول ولا يوجد شيء بالسحابة بعد: نرفع النسخة المحلية الحالية (إن وجدت) لحمايتها
-          pushDBToCloud();
+        const {data,found}=await loadCloudDBOnce(uid);
+        if(!currentUser||currentUser.uid!==uid)return;
+        DB=found?data:loadLocalDB(uid);
+        rememberCloudState();
+        saveLocalDB();
+        cloudReady=true;
+        attachRealtimeListeners(uid);
+        if(!found){
+          // Only this account's own local copy may be uploaded.
+          const savedCopy=loadLocalDB(uid);
+          DB=savedCopy;
+          lastSavedValues={};
+          saveDB();
         }
-        attachRealtimeListeners(user.uid);
-        setSyncState(navigator.onLine? "online":"offline");
-      }catch(e){ console.warn("cloud load error", e); setSyncState("offline"); }
-      ST.authBusy=false; ST.pinError="";
-      if(ST.screen==="login" || ST.screen==="landing"){ ST.screen="admin"; ST.adminPage="dashboard"; }
-      checkAutoBackup();
-    } else {
-      detachRealtimeListeners();
-      DB = loadLocalDB();
-      if(ST.screen==="admin"){ ST.screen="landing"; } // خرج المستخدم -> رجوع للشاشة الرئيسية
+        setSyncState(navigator.onLine?"online":"offline");
+      }catch(e){
+        if(!currentUser||currentUser.uid!==uid)return;
+        console.warn("Cloud loading failed; retaining account-scoped local data",e);
+        DB=loadLocalDB(uid);
+        rememberCloudState();
+        cloudReady=true;
+        attachRealtimeListeners(uid);
+        setSyncState("offline");
+      }
+      ST.authBusy=false;ST.pinError="";
+      ST.adminPage="dashboard";
+    }else{
+      DB=defaultDB();
+      ST.authBusy=false;
+      ST.screen="landing";
     }
     render();
   });
-  render(); // رسم أولي سريع بينما ننتظر رد onAuthStateChanged
+  render();
 }
+
 </script>
 </body>
 </html>
