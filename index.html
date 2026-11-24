@@ -190,6 +190,7 @@ details summary::-webkit-details-marker{display:none;}
 }
 </style>
 <link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-mobile-v2">
+<link rel="stylesheet" href="assets/invoice.css">
 </head>
 <body>
 <div class="df-ambient" aria-hidden="true"><span class="glow glow-a"></span><span class="glow glow-b"></span><span class="glow glow-c"></span><span class="grid-layer"></span></div>
@@ -1548,66 +1549,51 @@ function modalInvoice(){
 
 /* ===================== PUBLIC INVOICE (standalone, for client link) ===================== */
 function renderPublicInvoice(inv){
-  if(!inv) return `<div class="landing-wrap"><div class="card" style="max-width:420px;width:100%;text-align:center;">
-    <h2>الرابط غير صالح</h2><p class="muted small">تعذر قراءة بيانات الفاتورة من هذا الرابط.</p>
-  </div></div>`;
-  const total = (inv.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.price||0),0);
-  return `<div class="landing-wrap" style="align-items:flex-start;padding-top:30px;">
-    <div class="invoice-paper" id="printArea" style="margin:0 auto;">
-      <div class="invoice-head">
-        <div class="flex between center">
-          <div><div style="font-size:22px;font-weight:bold;">${esc(inv.bn||"فاتورة")}</div><div style="opacity:.85;font-size:12px;margin-top:2px;">${esc(inv.bc||"")}</div></div>
-          <div style="text-align:left;"><div style="background:rgba(255,255,255,.18);padding:5px 14px;border-radius:20px;font-size:11px;display:inline-block;">${esc(inv.st||"")}</div><div style="font-size:13px;margin-top:6px;opacity:.9;">${esc(inv.n||"")}</div></div>
-        </div>
-      </div>
-      <div class="invoice-body">
-        <div class="flex print-hide" style="justify-content:flex-end;gap:8px;margin-bottom:18px;">
-          <button class="btn-icon" style="background:#eef0f6;color:#1e2233;" onclick="window.print()" title="طباعة">${icon('printer',16)}</button>
-        </div>
-        <div class="grid g2 small" style="margin-bottom:18px;">
-          <div><p style="color:#94a3b8;font-size:11px;margin:0;">إلى</p><p style="font-weight:bold;margin:2px 0;">${esc(inv.cn||"—")}</p><p style="margin:0;color:#64748b;">${esc(inv.ce||"")}</p></div>
-          <div style="text-align:left;"><p style="color:#94a3b8;font-size:11px;margin:0;">تاريخ الفاتورة</p><p style="margin:2px 0;">${esc(inv.d||"")}</p><p style="color:#94a3b8;font-size:11px;margin:6px 0 0;">الاستحقاق</p><p style="margin:2px 0;">${esc(inv.due||"—")}</p></div>
-        </div>
-        <table><thead><tr><th>الوصف</th><th style="text-align:center;">الكمية</th><th style="text-align:center;">السعر</th><th style="text-align:left;">الإجمالي</th></tr></thead>
-        <tbody>${(inv.items||[]).map(it=>`<tr><td>${esc(it.desc)}</td><td style="text-align:center;">${it.qty}</td><td style="text-align:center;">$${fmt(it.price)}</td><td style="text-align:left;font-weight:bold;">$${fmt(Number(it.qty||0)*Number(it.price||0))}</td></tr>`).join("")}</tbody></table>
-        <div class="invoice-total-box"><span style="color:#4338ca;font-weight:bold;">الإجمالي المستحق</span><span style="font-size:24px;font-weight:bold;color:#1e2233;">$${fmt(total)}</span></div>
-        ${inv.notes? `<div class="invoice-foot-note" style="margin-top:16px;">${esc(inv.notes)}</div>`:""}
-        ${inv.bw? `<p style="text-align:center;margin-top:14px;"><a href="${esc(inv.bw)}" target="_blank" style="color:#6366f1;font-size:12px;text-decoration:none;">${esc(inv.bw)}</a></p>`:""}
-        <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:10px;">شكراً لتعاملك معنا</p>
-      </div>
-    </div>
-  </div>`;
+  if(!inv) return `<div class="landing-wrap"><div class="card"><h2>الرابط غير صالح</h2><p>تعذر قراءة بيانات الفاتورة من هذا الرابط.</p></div></div>`;
+  return invoicePreview(inv, false);
 }
 
-
 function modalInvoiceView(){
-  const inv = ST.modal.data;
-  const total = (inv.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.price||0),0);
-  return `<div class="modal-overlay">
-    <div class="invoice-paper" id="printArea">
-      <div class="invoice-head">
-        <div class="flex between center">
-          <div><div style="font-size:22px;font-weight:bold;">${esc(DB.settings.businessName||"فاتورة")}</div><div style="opacity:.85;font-size:12px;margin-top:2px;">${esc(DB.settings.businessContact||"")}</div></div>
-          <div style="text-align:left;"><div style="background:rgba(255,255,255,.18);padding:5px 14px;border-radius:20px;font-size:11px;display:inline-block;">${esc(inv.status)}</div><div style="font-size:13px;margin-top:6px;opacity:.9;">${esc(inv.number)}</div></div>
-        </div>
+  return invoicePreview(invoicePayload(ST.modal.data), true);
+}
+
+function invoicePayload(inv){
+  return {
+    n:inv.number, d:inv.date, due:inv.dueDate, cn:inv.clientName, ce:inv.clientEmail,
+    items:inv.items, notes:inv.notes, st:inv.status, bn:DB.settings.businessName,
+    bc:DB.settings.businessContact, bw:DB.settings.businessWebsite
+  };
+}
+
+function invoicePreview(inv, internal){
+  const website = safeExternalUrl(inv.bw);
+  const rows = (inv.items||[]).map(it=>`<tr><td>${esc(it.desc)}</td><td>${esc(it.qty)}</td><td><bdi>$${fmt(it.price)}</bdi></td><td><bdi>$${fmt(Number(it.qty||0)*Number(it.price||0))}</bdi></td></tr>`).join("");
+  return `<div class="${internal?'modal-overlay':'landing-wrap'} bill-view">
+    <div class="bill-wrap">
+      <div class="bill-actions print-hide">
+        <button onclick="window.print()">${icon('printer',15)} طباعة</button>
+        ${internal?`<button onclick="App.exportPng('printArea',this.dataset.number)" data-number="${esc(inv.n)}">${icon('image',15)} صورة</button>
+        <button onclick="App.copyInvoiceText()">${icon('copy',15)} نسخ</button>
+        <button class="bill-close" onclick="App.closeModal()" aria-label="إغلاق">${icon('close',16)}</button>`:""}
       </div>
-      <div class="invoice-body">
-        <div class="flex print-hide" style="justify-content:flex-end;gap:8px;margin-bottom:18px;">
-          <button class="btn-icon" style="background:#eef0f6;color:#1e2233;" onclick="window.print()">${icon('printer',16)}</button>
-          <button class="btn-icon" style="background:#eef0f6;color:#1e2233;" onclick="App.copyInvoiceText()">${icon('copy',16)}</button>
-          <button class="btn-icon" style="background:#eef0f6;color:#1e2233;" onclick="App.exportPng('printArea','${inv.number}')">${icon('image',16)}</button>
-          <button class="btn-icon" style="background:#eef0f6;color:#1e2233;" onclick="App.closeModal()">${icon('close',16)}</button>
-        </div>
-        <div class="grid g2 small" style="margin-bottom:18px;">
-          <div><p style="color:#94a3b8;font-size:11px;margin:0;">إلى</p><p style="font-weight:bold;margin:2px 0;">${esc(inv.clientName||"—")}</p><p style="margin:0;color:#64748b;">${esc(inv.clientEmail)}</p></div>
-          <div style="text-align:left;"><p style="color:#94a3b8;font-size:11px;margin:0;">تاريخ الفاتورة</p><p style="margin:2px 0;">${esc(inv.date)}</p><p style="color:#94a3b8;font-size:11px;margin:6px 0 0;">الاستحقاق</p><p style="margin:2px 0;">${esc(inv.dueDate||"—")}</p></div>
-        </div>
-        <table><thead><tr><th>الوصف</th><th style="text-align:center;">الكمية</th><th style="text-align:center;">السعر</th><th style="text-align:left;">الإجمالي</th></tr></thead>
-        <tbody>${(inv.items||[]).map(it=>`<tr><td>${esc(it.desc)}</td><td style="text-align:center;">${it.qty}</td><td style="text-align:center;">$${fmt(it.price)}</td><td style="text-align:left;font-weight:bold;">$${fmt(Number(it.qty||0)*Number(it.price||0))}</td></tr>`).join("")}</tbody></table>
-        <div class="invoice-total-box"><span style="color:#4338ca;font-weight:bold;">الإجمالي المستحق</span><span style="font-size:24px;font-weight:bold;color:#1e2233;">$${fmt(total)}</span></div>
-        ${inv.notes? `<div class="invoice-foot-note" style="margin-top:16px;">${esc(inv.notes)}</div>`:""}
-        <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:22px;">شكراً لتعاملك معنا</p>
-      </div>
+      <article class="bill" id="printArea" dir="rtl">
+        <header class="bill-head">
+          <div><h1>فاتورة</h1><bdi class="bill-number">${esc(inv.n)}</bdi></div>
+          <div class="bill-studio"><strong>${esc(inv.bn)}</strong><bdi dir="auto">${esc(inv.bc)}</bdi>
+          ${inv.st?`<span class="bill-status">${esc(inv.st)}</span>`:""}</div>
+        </header>
+        <section class="bill-content">
+          <div class="bill-info">
+            <div><small>فاتورة إلى</small><strong>${esc(inv.cn||"—")}</strong><bdi>${esc(inv.ce)}</bdi></div>
+            <div><small>تاريخ الإصدار</small><bdi>${esc(inv.d||"—")}</bdi></div>
+            <div><small>تاريخ الاستحقاق</small><bdi>${esc(inv.due||"—")}</bdi></div>
+          </div>
+          <table><colgroup><col style="width:46%"><col style="width:14%"><col style="width:19%"><col style="width:21%"></colgroup><thead><tr><th>الوصف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>${rows}</tbody></table>
+          <div class="bill-total"><strong>${inv.st==="مدفوعة"?"الإجمالي المدفوع":"الإجمالي المستحق"}</strong><bdi>$${fmt(invoiceTotal(inv))}</bdi></div>
+          ${inv.notes?`<aside><strong>ملاحظات وبيانات الدفع</strong><div>${esc(inv.notes)}</div></aside>`:""}
+          <footer><span>شكراً لتعاملك معنا</span>${website?`<a href="${esc(website)}" target="_blank" rel="noopener noreferrer"><bdi>${esc(inv.bw)}</bdi></a>`:""}</footer>
+        </section>
+      </article>
     </div>
   </div>`;
 }
@@ -2143,11 +2129,7 @@ const App = {
   },
   shareInvoiceLink(id){
     const inv = DB.invoices.find(i=>i.id===id); if(!inv) return;
-    const payload = {
-      n: inv.number||"", d: inv.date||"", due: inv.dueDate||"", cn: inv.clientName||"", ce: inv.clientEmail||"",
-      items: inv.items||[], notes: inv.notes||"", st: inv.status||"",
-      bn: DB.settings.businessName||"", bc: DB.settings.businessContact||"", bw: DB.settings.businessWebsite||""
-    };
+    const payload = invoicePayload(inv);
     const url = location.origin + location.pathname + "?invoice=" + encodePublicPayload(payload);
     App.copyText(url, "تم نسخ رابط الفاتورة، أرسله للعميل مباشرة.");
   },
