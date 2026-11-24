@@ -15,6 +15,9 @@
 <link href="https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css"
       rel="stylesheet" media="print" onload="this.media='all';document.documentElement.classList.add('uicons-ready');requestAnimationFrame(()=>window.verifyFlaticonIcons?.())"
       onerror="document.documentElement.classList.remove('uicons-ready')">
+<script async src="https://accounts.google.com/gsi/client"></script>
+<script async src="https://apis.google.com/js/api.js"></script>
+<script src="assets/google-drive.js"></script>
 <script src="assets/backup-folder.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Firebase (تخزين سحابي + مزامنة + دعم العمل بدون إنترنت) -->
@@ -510,6 +513,7 @@ function detachRealtimeListeners(){
   unsubscribers=[];
 }
 function resetCloudSession(){
+  DriveBackup.reset();
   BackupFolder.reset();
   clearTimeout(saveTimer);
   detachRealtimeListeners();
@@ -939,7 +943,7 @@ function backupBanner(){
   const done = DB.settings.lastBackupDate===today;
   return `<div class="banner" style="background:${done?'var(--greenBg)':'var(--amberBg)'};border:1px solid ${done?'var(--green)':'var(--amber)'};">
     <span class="flex gap center small">${icon(done?'check':'bell',16)} ${done? "تم تصدير نسخة يدوية اليوم" : "احفظ نسخة احتياطية يدوية دورياً"}</span>
-    <button class="btn btn-soft small" onclick="BackupFolder.run('save')">${icon('download',13)} نسخة على Drive</button>
+    <button class="btn btn-soft small" onclick="DriveBackup.run('save')">${icon('download',13)} نسخة على Drive</button>
   </div>`;
 }
 function topbarSyncStatusHtml(){
@@ -1422,7 +1426,8 @@ function pageSettings(){
   </div>
   <div class="card" style="margin-bottom:18px;">
     <h3 style="margin-top:0;">النسخ الاحتياطي</h3>
-    ${BackupFolder.panel()}
+    ${DriveBackup.panel()}
+    <details><summary>مجلد Google Drive للكمبيوتر</summary>${BackupFolder.panel()}</details>
     <p class="muted small">ملفات JSON المحلية</p>
     <div class="flex gap wrap" style="margin-bottom:14px;">
       <button class="btn btn-primary" onclick="App.exportBackup()">${icon('download',16)} تنزيل نسخة محلية</button>

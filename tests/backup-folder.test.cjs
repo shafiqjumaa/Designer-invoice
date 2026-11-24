@@ -37,3 +37,28 @@ test("Arabic invoice headings override global character spacing for PNG renderin
   const css=fs.readFileSync(path.join(root,"assets/invoice.css"),"utf8");
   assert.match(css,/\.bill table th\{letter-spacing:0;direction:rtl;/);
 });
+test("Drive API uploads to the designated folder and restores both versions",async()=>{
+  const folder="1CUhkjuhx-dfB72d9r3LlQfqEOUkUIbj8",files=[],messages=[];
+  const google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){options.callback({access_token:"test",expires_in:3600});}};}}}};
+  const ctx=vm.createContext({google,window:{google},currentUser:{uid:"test"},cloudReady:true,ST:{},DB:{settings:{},invoices:[]},
+    CLOUD_KEYS:["settings","invoices"],crypto,URLSearchParams,Blob,localStorage:{getItem:()=>"test"},alert:m=>messages.push(m),
+    confirm:()=>true,todayStr:()=>"2026-11-25",render(){},saveDB(){},validateImportedDB:d=>d,
+    async fetch(url,options){
+      assert.equal(options.headers.Authorization,"Bearer test");
+      let result;
+      if(url.includes("/upload/")){
+        const parts=options.body.split("\r\n");
+        const meta=JSON.parse(parts[3]);assert.deepEqual(meta.parents,[folder]);
+        files.push({name:meta.name,data:JSON.parse(parts[7])});result={id:String(files.length)};
+      }else if(url.includes("alt=media"))result=files[Number(url.split("/").pop().split("?")[0])-1].data;
+      else if(url.includes("/"+folder+"?"))result={mimeType:"application/vnd.google-apps.folder",capabilities:{canAddChildren:true}};
+      else result={files:files.map((f,i)=>({name:f.name,id:String(i+1)}))};
+      return {ok:true,json:async()=>result};
+    }});
+  vm.runInContext(fs.readFileSync(path.join(root,"assets/backup-folder.js"),"utf8"),ctx);
+  const api=vm.runInContext(fs.readFileSync(path.join(root,"assets/google-drive.js"),"utf8")+";DriveBackup",ctx);
+  await api.run("save");await new Promise(resolve=>setTimeout(resolve,4));
+  ctx.DB.invoices.push({id:"invoice"});await api.run("save");
+  ctx.DB.invoices=[];await api.run("latest");assert.equal(ctx.DB.invoices.length,1,messages.join("\n"));
+  await api.run("list");await api.run("selected",1);assert.equal(ctx.DB.invoices.length,0);
+});
