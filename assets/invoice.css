@@ -22,7 +22,8 @@
 .bill-info bdi{font-size:14px;text-align:right;}
 .bill table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;}
 .bill table th,.bill table td{text-align:center;padding:10px 6px;border:0;border-bottom:1px solid #dde7e5;color:#233c43;font-size:14px;background:white;}
-.bill table th{background:#e8f1ef;color:#2e5558;font-size:12px;}
+/* Keep Arabic headings in a single shaped text run during PNG export. */
+.bill table th{letter-spacing:0;direction:rtl;background:#e8f1ef;color:#2e5558;font-size:12px;}
 .bill tr>:first-child{text-align:start;}
 .bill tr>:last-child{text-align:end;font-weight:700;}
 .bill-total{margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-inline-start:4px solid #177966;background:#e4f5ee;color:#104c40;}

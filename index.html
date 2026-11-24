@@ -15,6 +15,7 @@
 <link href="https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css"
       rel="stylesheet" media="print" onload="this.media='all';document.documentElement.classList.add('uicons-ready');requestAnimationFrame(()=>window.verifyFlaticonIcons?.())"
       onerror="document.documentElement.classList.remove('uicons-ready')">
+<script src="assets/backup-folder.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Firebase (تخزين سحابي + مزامنة + دعم العمل بدون إنترنت) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -190,7 +191,7 @@ details summary::-webkit-details-marker{display:none;}
 }
 </style>
 <link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-mobile-v2">
-<link rel="stylesheet" href="assets/invoice.css">
+<link rel="stylesheet" href="assets/invoice.css?v=2">
 </head>
 <body>
 <div class="df-ambient" aria-hidden="true"><span class="glow glow-a"></span><span class="glow glow-b"></span><span class="glow glow-c"></span><span class="grid-layer"></span></div>
@@ -509,6 +510,7 @@ function detachRealtimeListeners(){
   unsubscribers=[];
 }
 function resetCloudSession(){
+  BackupFolder.reset();
   clearTimeout(saveTimer);
   detachRealtimeListeners();
   pendingKeys.clear();inFlightKeys.clear();
@@ -937,7 +939,7 @@ function backupBanner(){
   const done = DB.settings.lastBackupDate===today;
   return `<div class="banner" style="background:${done?'var(--greenBg)':'var(--amberBg)'};border:1px solid ${done?'var(--green)':'var(--amber)'};">
     <span class="flex gap center small">${icon(done?'check':'bell',16)} ${done? "تم تصدير نسخة يدوية اليوم" : "احفظ نسخة احتياطية يدوية دورياً"}</span>
-    <button class="btn btn-soft small" onclick="App.exportBackup()">${icon('download',13)} نسخة الآن</button>
+    <button class="btn btn-soft small" onclick="BackupFolder.run('save')">${icon('download',13)} نسخة على Drive</button>
   </div>`;
 }
 function topbarSyncStatusHtml(){
@@ -1420,9 +1422,10 @@ function pageSettings(){
   </div>
   <div class="card" style="margin-bottom:18px;">
     <h3 style="margin-top:0;">النسخ الاحتياطي</h3>
-    <p class="muted small">المزامنة السحابية ليست نسخة احتياطية مؤرّخة. صدّر ملف JSON واحفظه في مكان خاص. الاستيراد يستبدل البيانات الحالية بعد تأكيدك.</p>
+    ${BackupFolder.panel()}
+    <p class="muted small">ملفات JSON المحلية</p>
     <div class="flex gap wrap" style="margin-bottom:14px;">
-      <button class="btn btn-primary" onclick="App.exportBackup()">${icon('download',16)} تصدير نسخة الآن</button>
+      <button class="btn btn-primary" onclick="App.exportBackup()">${icon('download',16)} تنزيل نسخة محلية</button>
       <button class="btn btn-soft" onclick="document.getElementById('importFileInput').click()">${icon('upload',16)} استيراد نسخة</button>
     </div>
     <div class="small muted" style="margin-bottom:6px;">سجل النسخ الأخيرة:</div>
@@ -2147,9 +2150,18 @@ const App = {
     t+=`\nالإجمالي: $${fmt(total)}\n`; if(inv.notes) t+=`\n${inv.notes}\n`;
     try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(()=>alert("تم نسخ نص الفاتورة")); } else { const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); alert("تم نسخ نص الفاتورة"); } }catch(e){ alert("تعذر النسخ التلقائي."); }
   },
-  exportPng(elId, name){
+  async exportPng(elId, name){
     const el=document.getElementById(elId); if(!el||!window.html2canvas) return alert("تعذر تحميل أداة التصدير، تحقق من اتصال الإنترنت.");
-    html2canvas(el, {backgroundColor:"#ffffff", scale:2}).then(canvas=>{ const link=document.createElement("a"); link.download=`${name||"export"}.png`; link.href=canvas.toDataURL("image/png"); link.click(); });
+    try{
+      if(document.fonts)await document.fonts.ready;
+      const canvas=await html2canvas(el,{backgroundColor:"#ffffff",scale:2});
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+      if(!blob)throw Error("empty image");
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
+      link.download=(name||"export")+".png";link.href=url;link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),30000);
+    }catch(e){alert("تعذّر تصدير الصورة. أعد المحاولة بعد تحميل الخطوط أو استخدم الطباعة.");}
   },
 
   // SETTINGS
@@ -2229,6 +2241,7 @@ function buildStandaloneSignHtml(contract, businessName){
 function validateImportedDB(parsed){
   if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Error("صيغة غير صالحة");
   const base=defaultDB(),out={};
+  if(!Object.keys(base).some(key=>Object.hasOwn(parsed,key)))throw Error("لا يحتوي الملف على بيانات DesignerFlow");
   for(const [key,defaultValue] of Object.entries(base)){
     const value=Object.prototype.hasOwnProperty.call(parsed,key)?parsed[key]:defaultValue;
     if(Array.isArray(defaultValue)){
@@ -2246,7 +2259,11 @@ document.getElementById("importFileInput").addEventListener("change", function(e
   const reader=new FileReader();
   reader.onload=function(ev){
     try{
-      const parsed=validateImportedDB(JSON.parse(ev.target.result));
+      const fileData=JSON.parse(ev.target.result);
+      const wrapped=fileData?.format==="designerflow-backup-v1";
+      if(wrapped && (fileData.owner!==currentUser?.uid || !CLOUD_KEYS.every(k=>Object.hasOwn(fileData.data||{},k))))
+        throw Error("النسخة غير مكتملة أو تخص حساباً آخر.");
+      const parsed=validateImportedDB(wrapped?fileData.data:fileData);
       const records=parsed.clients.length+parsed.batches.length+parsed.invoices.length;
       if(!currentUser||!cloudReady)throw Error("سجّل الدخول وتحقق من الاتصال بالسحابة قبل الاستيراد");
       if(!confirm("الملف يحوي "+records+" سجلاً من العملاء والأعمال والفواتير. سيتم استبدال بيانات حسابك الحالي بالكامل. صدّر نسخة حالية أولاً. هل تتابع؟"))return;
