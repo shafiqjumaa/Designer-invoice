@@ -193,7 +193,7 @@ details summary::-webkit-details-marker{display:none;}
   .theme-fab{top:14px;left:14px;}
 }
 </style>
-<link rel="stylesheet" href="assets/orizon-theme.css?v=20261123-mobile-v2">
+<link rel="stylesheet" href="assets/orizon-theme.css?v=expense-services-v1">
 <link rel="stylesheet" href="assets/invoice.css?v=2">
 </head>
 <body>
@@ -757,7 +757,7 @@ function renderModal(){
 function renderLanding(){
   return `
   <div class="landing-wrap"><div class="landing-box">
-    <div class="logo-circle">${icon("palette",30)}</div>
+    <div class="logo-circle"><img class="df-app-mark" src="icons/icon-192.png" alt=""></div>
     <div class="df-eyebrow" style="margin-bottom:8px">DESIGNERFLOW · WORKSPACE</div>
     <h1 style="margin:0 0 6px;font-size:26px;font-weight:750;">أهلاً بك في مساحة عملك</h1>
     <p class="muted small" style="margin-bottom:24px;">مشاريعك، عملاؤك وفواتيرك في مكان واحد.</p>
@@ -870,7 +870,7 @@ function renderAdmin(){
     <button type="button" class="mobile-shade" onclick="App.toggleMobileNav()" aria-label="إغلاق القائمة"></button>
     <aside class="sidebar" id="designerSidebar">
       <div class="brand-header">
-        <div class="brand-logo">${icon('palette',20)}</div>
+        <div class="brand-logo"><img class="df-app-mark" src="icons/icon-192.png" alt=""></div>
         <div class="brand-text">
           <div class="bold">DesignerFlow</div>
           ${sidebarSyncStatusHtml()}
@@ -978,7 +978,7 @@ function pageDashboard(stats){
       <h1>كل أعمالك، بصورة أوضح.</h1>
       <p>راقب المشاريع والمدفوعات، وابدأ مهمتك التالية من مساحة واحدة منظمة.</p>
     </div>
-    <div class="df-hero-orbit" aria-hidden="true">${icon("palette",40)}</div>
+    <div class="df-hero-orbit" aria-hidden="true"><img class="df-app-mark" src="icons/icon-192.png" alt=""></div>
   </section>
   ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
     <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للعرض فقط. لا يمكن تعديل البيانات قبل إعادة الاتصال. يمكنك تنزيل نسخة JSON للحفظ.</div></div>
@@ -1210,6 +1210,33 @@ function pageContracts(){
 }
 
 /* ---------- EXPENSES ---------- */
+const EXPENSE_SERVICES = [
+  {"name": "ChatGPT", "icon": "openai", "aliases": ["chat gpt", "شات جي بي تي"]},
+  {"name": "Claude", "icon": "claude-color", "aliases": ["كلود"]},
+  {"name": "Gemini", "icon": "gemini-color", "aliases": ["google gemini", "جيميني"]},
+  {"name": "Midjourney", "icon": "midjourney", "aliases": ["ميدجورني"]},
+  {"name": "Higgsfield", "icon": "higgsfield", "aliases": ["هيغزفيلد"]},
+  {"name": "Perplexity", "icon": "perplexity-color", "aliases": ["بيربلكسيتي"]},
+  {"name": "Adobe Creative Cloud", "icon": "adobecreativecloud", "aliases": ["adobe", "أدوبي"]},
+  {"name": "Canva", "icon": "canva", "aliases": ["كانفا"]},
+  {"name": "Figma", "icon": "figma-color", "aliases": ["فيغما", "فيجما"]},
+  {"name": "Envato Elements", "icon": "envato", "aliases": ["envato", "إنفاتو"]},
+  {"name": "Notion", "icon": "notion", "aliases": ["نوشن"]},
+  {"name": "Google Drive", "icon": "googledrive", "aliases": ["google one", "جوجل درايف"]},
+];
+function expenseService(name){
+  const normalize = value => String(value || "").toLowerCase().replace(/[\s_-]+/g, " ").trim();
+  const input = normalize(name);
+  return EXPENSE_SERVICES.find(service => [service.name, ...service.aliases].some(alias => {
+    const key = normalize(alias);
+    return input === key || input.startsWith(key + " ");
+  }));
+}
+function expenseServiceIcon(service){
+  if(!service) return "";
+  const mark = service.icon === "higgsfield" ? "H" : `<img src="assets/services/${service.icon}.svg" alt="">`;
+  return `<span class="expense-service-icon" aria-hidden="true">${mark}</span>`;
+}
 function pageExpenses(){
   const list = DB.expenses.slice().reverse();
   const total = DB.expenses.reduce((s,e)=>s+Number(e.amount||0),0);
@@ -1226,7 +1253,7 @@ function pageExpenses(){
   </div>
   ${list.length===0? emptyState("wallet","لا يوجد مصاريف مسجلة بعد.","مصروف جديد","App.openExpenseModal()") :
   list.map(e=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-      <div><div class="bold small">${esc(e.name)} <span class="badge badge-grey">${esc(e.category)}</span></div><div class="muted small">${esc(e.date)} ${e.notes?(" · "+esc(e.notes)):""}</div></div>
+      <div class="expense-service-row">${expenseServiceIcon(expenseService(e.name))}<div><div class="bold small">${esc(e.name)} <span class="badge badge-grey">${esc(e.category)}</span></div><div class="muted small">${esc(e.date)} ${e.notes?(" · "+esc(e.notes)):""}</div></div></div>
       <div class="flex gap center"><span class="bold" style="color:var(--rose);">-$${fmt(e.amount)}</span>
         <button class="btn-icon btn-soft" onclick="App.openExpenseModal('${e.id}')">${icon('edit',14)}</button>
         <button class="btn-icon btn-danger" onclick="App.deleteExpense('${e.id}')">${icon('trash',14)}</button>
@@ -1657,6 +1684,10 @@ function modalExpense(){
   return `<div class="modal-overlay" onclick="if(event.target===this) App.closeModal()">
   <div class="modal-box narrow">
     <div class="modal-head"><h2>مصروف</h2><button class="close-x" onclick="App.closeModal()">${icon('close',18)}</button></div>
+    <details class="expense-presets" ${e.name ? "" : "open"}>
+      <summary>اقتراحات الاشتراكات</summary>
+      <div class="expense-service-grid">${EXPENSE_SERVICES.map((service,index)=>`<button type="button" class="chip" onclick="App.selectExpenseService(${index})">${expenseServiceIcon(service)}<bdi>${service.name}</bdi></button>`).join("")}</div>
+    </details>
     <div class="field"><label class="lbl">اسم المصروف</label><input value="${esc(e.name)}" oninput="App.modalUpdateSilent('name', this.value)"></div>
     <div class="field"><label class="lbl">التصنيف</label><div>${EXPENSE_CATEGORIES.map(c=>`<button class="chip ${e.category===c?'active':''}" onclick="App.modalUpdate('category','${c}')">${c}</button>`).join("")}</div></div>
     <div class="grid g2">
@@ -2033,6 +2064,12 @@ const App = {
   deleteSub(id){ if(!confirm("حذف هذا الاشتراك؟")) return; DB.subscriptions=DB.subscriptions.filter(s=>s.id!==id); saveDB(); render(); },
 
   // EXPENSES
+  selectExpenseService(index){
+    const service = EXPENSE_SERVICES[index];
+    if(!service || ST.modal?.type !== "expense") return;
+    Object.assign(ST.modal.data, {name:service.name, category:"اشتراكات"});
+    renderModal();
+  },
   openExpenseModal(id){ let data; if(id) data=Object.assign({}, DB.expenses.find(e=>e.id===id)); else data={id:uid(), name:"", category:EXPENSE_CATEGORIES[0], amount:0, date:todayStr(), notes:""}; ST.modal={type:"expense", data}; renderModal(); },
   saveExpense(){ const d=ST.modal.data; if(!d.name.trim()) return alert("الرجاء كتابة اسم المصروف"); const clean={...d, amount:Number(d.amount||0)}; const idx=DB.expenses.findIndex(e=>e.id===clean.id); if(idx>=0) DB.expenses[idx]=clean; else DB.expenses.push(clean); saveDB(); App.closeModal(); render(); },
   deleteExpense(id){ if(!confirm("حذف هذا المصروف؟")) return; DB.expenses=DB.expenses.filter(e=>e.id!==id); saveDB(); render(); },

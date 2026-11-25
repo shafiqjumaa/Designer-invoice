@@ -587,3 +587,12 @@ body.light .option-btn{background:#fff;}
   .invoice-paper .invoice-body>table{min-width:0!important;}
   .invoice-paper .invoice-body>.print-hide{position:static;}
 }
+
+.df-app-mark{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover;}
+.expense-presets{margin-bottom:16px;}
+.expense-presets summary{cursor:pointer;font-weight:700;font-size:.85rem;}
+.expense-service-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.expense-service-grid .chip,.expense-service-row{display:flex;align-items:center;gap:8px;}
+.expense-service-grid .chip{margin:0;}
+.expense-service-icon{display:inline-grid;place-items:center;flex:none;width:26px;height:26px;border-radius:7px;background:#fff;color:#111;font:bold 17px/1 sans-serif;}
+.expense-service-icon img{display:block;width:18px;height:18px;}

@@ -1,13 +1,24 @@
 /* DesignerFlow v4: application-shell cache only; user financial data stays
    in Firestore and account-scoped browser storage, never the shell cache. */
-const CACHE_NAME = "designerflow-shell-v8";
+const CACHE_NAME = "designerflow-shell-v9";
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./assets/orizon-theme.css?v=20261123-mobile-v2",
+  "./assets/orizon-theme.css?v=expense-services-v1",
   "./assets/invoice.css?v=2",
   "./assets/backup-folder.js",
   "./assets/google-drive.js",
+  "./assets/services/adobecreativecloud.svg",
+  "./assets/services/canva.svg",
+  "./assets/services/claude-color.svg",
+  "./assets/services/envato.svg",
+  "./assets/services/figma-color.svg",
+  "./assets/services/gemini-color.svg",
+  "./assets/services/googledrive.svg",
+  "./assets/services/midjourney.svg",
+  "./assets/services/notion.svg",
+  "./assets/services/openai.svg",
+  "./assets/services/perplexity-color.svg",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
