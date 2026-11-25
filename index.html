@@ -1253,7 +1253,7 @@ function pageExpenses(){
   </div>
   ${list.length===0? emptyState("wallet","لا يوجد مصاريف مسجلة بعد.","مصروف جديد","App.openExpenseModal()") :
   list.map(e=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-      <div class="expense-service-row">${expenseServiceIcon(expenseService(e.name))}<div><div class="bold small">${esc(e.name)} <span class="badge badge-grey">${esc(e.category)}</span></div><div class="muted small">${esc(e.date)} ${e.notes?(" · "+esc(e.notes)):""}</div></div></div>
+      <div class="expense-service-row">${expenseServiceIcon(expenseService(e.serviceName ?? e.name))}<div><div class="bold small">${esc(e.name)} <span class="badge badge-grey">${esc(e.category)}</span></div><div class="muted small">${esc(e.date)} ${e.notes?(" · "+esc(e.notes)):""}</div></div></div>
       <div class="flex gap center"><span class="bold" style="color:var(--rose);">-$${fmt(e.amount)}</span>
         <button class="btn-icon btn-soft" onclick="App.openExpenseModal('${e.id}')">${icon('edit',14)}</button>
         <button class="btn-icon btn-danger" onclick="App.deleteExpense('${e.id}')">${icon('trash',14)}</button>
@@ -1681,15 +1681,21 @@ function contactsInnerHtml(contacts){
 /* ---------- Expense / Subscription / Waitlist modals ---------- */
 function modalExpense(){
   const e = ST.modal.data;
+  const selectedService = expenseService(e.serviceName ?? e.name);
   return `<div class="modal-overlay" onclick="if(event.target===this) App.closeModal()">
   <div class="modal-box narrow">
     <div class="modal-head"><h2>مصروف</h2><button class="close-x" onclick="App.closeModal()">${icon('close',18)}</button></div>
-    <details class="expense-presets" ${e.name ? "" : "open"}>
-      <summary>اقتراحات الاشتراكات</summary>
-      <div class="expense-service-grid">${EXPENSE_SERVICES.map((service,index)=>`<button type="button" class="chip" onclick="App.selectExpenseService(${index})">${expenseServiceIcon(service)}<bdi>${service.name}</bdi></button>`).join("")}</div>
-    </details>
-    <div class="field"><label class="lbl">اسم المصروف</label><input value="${esc(e.name)}" oninput="App.modalUpdateSilent('name', this.value)"></div>
     <div class="field"><label class="lbl">التصنيف</label><div>${EXPENSE_CATEGORIES.map(c=>`<button class="chip ${e.category===c?'active':''}" onclick="App.modalUpdate('category','${c}')">${c}</button>`).join("")}</div></div>
+    ${e.category==="اشتراكات" ? `<div class="field"><label class="lbl" for="expenseService">نوع الاشتراك</label>
+      <div class="expense-service-row">${expenseServiceIcon(selectedService)}
+        <select id="expenseService" onchange="App.selectExpenseService(this.value)">
+          <option value="" disabled ${!selectedService && !e.name && e.serviceName == null ? "selected" : ""}>اختر خدمة الاشتراك</option>
+          ${EXPENSE_SERVICES.map(service=>`<option value="${service.name}" ${selectedService===service?"selected":""}>${service.name}</option>`).join("")}
+          <option value="custom" ${!selectedService && (e.name || e.serviceName==="")?"selected":""}>اشتراك آخر</option>
+        </select>
+      </div>
+    </div>` : ""}
+    <div class="field"><label class="lbl">اسم المصروف</label><input id="expenseName" value="${esc(e.name)}" oninput="App.modalUpdateSilent('name', this.value)"></div>
     <div class="grid g2">
       <div class="field"><label class="lbl">القيمة $</label><input type="number" inputmode="decimal" value="${e.amount}" oninput="App.modalUpdateSilent('amount', this.value, true)"></div>
       <div class="field"><label class="lbl">التاريخ</label><input type="date" value="${e.date}" oninput="App.modalUpdateSilent('date', this.value)"></div>
@@ -2064,11 +2070,19 @@ const App = {
   deleteSub(id){ if(!confirm("حذف هذا الاشتراك؟")) return; DB.subscriptions=DB.subscriptions.filter(s=>s.id!==id); saveDB(); render(); },
 
   // EXPENSES
-  selectExpenseService(index){
-    const service = EXPENSE_SERVICES[index];
-    if(!service || ST.modal?.type !== "expense") return;
-    Object.assign(ST.modal.data, {name:service.name, category:"اشتراكات"});
+  selectExpenseService(value){
+    if(ST.modal?.type !== "expense") return;
+    const data = ST.modal.data;
+    if(value === "custom"){
+      data.serviceName = "";
+    }else{
+      const service = EXPENSE_SERVICES.find(item => item.name === value);
+      if(!service) return;
+      data.serviceName = data.name = service.name;
+    }
     renderModal();
+    document.getElementById(value === "custom" ? "expenseName" : "expenseService")?.focus();
+    if(value === "custom") document.getElementById("expenseName")?.select();
   },
   openExpenseModal(id){ let data; if(id) data=Object.assign({}, DB.expenses.find(e=>e.id===id)); else data={id:uid(), name:"", category:EXPENSE_CATEGORIES[0], amount:0, date:todayStr(), notes:""}; ST.modal={type:"expense", data}; renderModal(); },
   saveExpense(){ const d=ST.modal.data; if(!d.name.trim()) return alert("الرجاء كتابة اسم المصروف"); const clean={...d, amount:Number(d.amount||0)}; const idx=DB.expenses.findIndex(e=>e.id===clean.id); if(idx>=0) DB.expenses[idx]=clean; else DB.expenses.push(clean); saveDB(); App.closeModal(); render(); },
