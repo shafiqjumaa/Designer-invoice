@@ -6,7 +6,7 @@
 <title>DesignerFlow | نظام إدارة أعمال المصمم</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#050914">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="icon" type="image/svg+xml" href="icons/designerflow.svg">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -193,7 +193,7 @@ details summary::-webkit-details-marker{display:none;}
   .theme-fab{top:14px;left:14px;}
 }
 </style>
-<link rel="stylesheet" href="assets/orizon-theme.css?v=expense-services-v1">
+<link rel="stylesheet" href="assets/orizon-theme.css?v=transparent-mark-v1">
 <link rel="stylesheet" href="assets/invoice.css?v=2">
 </head>
 <body>
@@ -757,7 +757,7 @@ function renderModal(){
 function renderLanding(){
   return `
   <div class="landing-wrap"><div class="landing-box">
-    <div class="logo-circle"><img class="df-app-mark" src="icons/icon-192.png" alt=""></div>
+    <div class="logo-circle"><img class="df-app-mark" src="icons/designerflow.svg" alt=""></div>
     <div class="df-eyebrow" style="margin-bottom:8px">DESIGNERFLOW · WORKSPACE</div>
     <h1 style="margin:0 0 6px;font-size:26px;font-weight:750;">أهلاً بك في مساحة عملك</h1>
     <p class="muted small" style="margin-bottom:24px;">مشاريعك، عملاؤك وفواتيرك في مكان واحد.</p>
@@ -870,7 +870,7 @@ function renderAdmin(){
     <button type="button" class="mobile-shade" onclick="App.toggleMobileNav()" aria-label="إغلاق القائمة"></button>
     <aside class="sidebar" id="designerSidebar">
       <div class="brand-header">
-        <div class="brand-logo"><img class="df-app-mark" src="icons/icon-192.png" alt=""></div>
+        <div class="brand-logo"><img class="df-app-mark" src="icons/designerflow.svg" alt=""></div>
         <div class="brand-text">
           <div class="bold">DesignerFlow</div>
           ${sidebarSyncStatusHtml()}
@@ -978,7 +978,7 @@ function pageDashboard(stats){
       <h1>كل أعمالك، بصورة أوضح.</h1>
       <p>راقب المشاريع والمدفوعات، وابدأ مهمتك التالية من مساحة واحدة منظمة.</p>
     </div>
-    <div class="df-hero-orbit" aria-hidden="true"><img class="df-app-mark" src="icons/icon-192.png" alt=""></div>
+    <div class="df-hero-orbit" aria-hidden="true"><img class="df-app-mark" src="icons/designerflow.svg" alt=""></div>
   </section>
   ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
     <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للعرض فقط. لا يمكن تعديل البيانات قبل إعادة الاتصال. يمكنك تنزيل نسخة JSON للحفظ.</div></div>

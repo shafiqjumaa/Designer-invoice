@@ -189,8 +189,8 @@ test('mobile component fields have readable labels',()=>{
 test('installed mobile app uses current CSS and supports landscape',()=>{
   const sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
   const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
-  assert.match(sw, /designerflow-shell-v9/);
-  assert.match(sw, /orizon-theme\.css\?v=expense-services-v1/);
-  assert.match(html, /orizon-theme\.css\?v=expense-services-v1/);
+  assert.match(sw, /designerflow-shell-v10/);
+  assert.match(sw, /orizon-theme\.css\?v=transparent-mark-v1/);
+  assert.match(html, /orizon-theme\.css\?v=transparent-mark-v1/);
   assert.equal(manifest.orientation,'any');
 });

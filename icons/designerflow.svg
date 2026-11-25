@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="252 225 757 804">
+  <defs>
+    <linearGradient id="spectrum" gradientUnits="userSpaceOnUse" x1="282" y1="270" x2="963" y2="765">
+      <stop stop-color="#a333f7"/><stop offset=".37" stop-color="#5031fa"/><stop offset=".7" stop-color="#0946fa"/><stop offset="1" stop-color="#008fff"/>
+    </linearGradient>
+    <linearGradient id="aqua" gradientUnits="userSpaceOnUse" x1="620" y1="540" x2="600" y2="1003">
+      <stop stop-color="#00dcec" stop-opacity="0"/><stop offset="1" stop-color="#00e7ed"/>
+    </linearGradient>
+    <radialGradient id="mint" gradientUnits="userSpaceOnUse" cx="280" cy="1003" r="235">
+      <stop stop-color="#6bf6d6"/><stop offset="1" stop-color="#6bf6d6" stop-opacity="0"/>
+    </radialGradient>
+    <path id="letter" fill-rule="evenodd" d="M315 251H631C834 251 982 413 982 626S836 1003 631 1003H315Q279 1003 279 967V287Q279 251 315 251ZM481 417Q443 417 443 454V794Q443 829 481 829H627C736 829 813 741 813 625S735 417 627 417Z"/>
+  </defs>
+  <g xmlns:xlink="http://www.w3.org/1999/xlink">
+    <use xlink:href="#letter" fill="url(#spectrum)"/><use xlink:href="#letter" fill="url(#aqua)"/><use xlink:href="#letter" fill="url(#mint)"/>
+  </g>
+</svg>

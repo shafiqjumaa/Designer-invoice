@@ -588,7 +588,11 @@ body.light .option-btn{background:#fff;}
   .invoice-paper .invoice-body>.print-hide{position:static;}
 }
 
-.df-app-mark{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover;}
+.brand-logo:has(.df-app-mark),.logo-circle:has(.df-app-mark),.df-hero-orbit:has(.df-app-mark){
+  background:transparent;border:0;box-shadow:none;
+}
+.df-hero-orbit:has(.df-app-mark)::before{content:none;}
+.df-app-mark{display:block;width:100%;height:100%;object-fit:contain;}
 .expense-presets{margin-bottom:16px;}
 .expense-presets summary{cursor:pointer;font-weight:700;font-size:.85rem;}
 .expense-service-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
