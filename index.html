@@ -18,6 +18,7 @@
 <script async src="https://accounts.google.com/gsi/client"></script>
 <script async src="https://apis.google.com/js/api.js"></script>
 <script src="assets/google-drive.js"></script>
+<script src="assets/studio.js"></script>
 <script src="assets/backup-folder.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Firebase (تخزين سحابي + مزامنة + دعم العمل بدون إنترنت) -->
@@ -879,6 +880,7 @@ function renderAdmin(){
       <div class="navlist">
         ${navBtn("dashboard","home","الرئيسية")}
         ${navBtn("work","palette","المشاريع والأعمال")}
+        ${navBtn("team","users","توزيع شغل الفريق")}
         ${navBtn("clients","users","العملاء")}
         <details class="nav-group" ${["invoices","contracts","expenses","subscriptions"].includes(ST.adminPage)?"open":""}>
           <summary class="navbtn group-heading">${icon("wallet",18)} <span class="navlabel">المالية والعقود</span> <span class="group-chevron">${icon("chevronLeft",12)}</span></summary>
@@ -912,7 +914,7 @@ function renderAdmin(){
         <div class="df-topbar-context">
           <div>
             <span class="df-topbar-breadcrumb">DESIGNERFLOW / WORKSPACE</span>
-            <span class="df-topbar-heading">${({dashboard:"لوحة التحكم",work:"المشاريع",clients:"العملاء",invoices:"الفواتير",contracts:"العقود",expenses:"المصاريف",subscriptions:"الاشتراكات",responses:"الطلبات",waitlist:"قائمة الانتظار",goals:"الأهداف",settings:"الإعدادات"})[ST.adminPage]||"مساحة العمل"}</span>
+            <span class="df-topbar-heading">${({dashboard:"لوحة التحكم",team:"توزيع شغل الفريق",work:"المشاريع",clients:"العملاء",invoices:"الفواتير",contracts:"العقود",expenses:"المصاريف",subscriptions:"الاشتراكات",responses:"الطلبات",waitlist:"قائمة الانتظار",goals:"الأهداف",settings:"الإعدادات"})[ST.adminPage]||"مساحة العمل"}</span>
           </div>
         </div>
         <div class="df-topbar-actions">
@@ -963,7 +965,7 @@ function renderAdminPage(stats){
     <button class="btn btn-primary" onclick="App.retryCloudConnection()">إعادة الاتصال</button>
   </div>`;
   const map = {dashboard:()=>pageDashboard(stats), work:()=> ST.openBatchId? pageBatchDetail() : pageDesignWorks(),
-    subscriptions:pageSubscriptions, invoices:pageInvoices, contracts:pageContracts, expenses:pageExpenses,
+    team:Studio.team, subscriptions:pageSubscriptions, invoices:pageInvoices, contracts:pageContracts, expenses:pageExpenses,
     waitlist:pageWaitlist, goals:pageGoals, clients:pageClients, responses:pageResponses, settings:pageSettings};
   return (map[ST.adminPage]||(()=>""))();
 }
@@ -980,6 +982,7 @@ function pageDashboard(stats){
     </div>
     <div class="df-hero-orbit" aria-hidden="true"><img class="df-app-mark" src="icons/designerflow.svg" alt=""></div>
   </section>
+  ${Studio.folderSetup()}${Studio.today()}
   ${ST.cloudError?`<div class="banner" style="background:var(--roseBg);border:1px solid var(--rose);">
     <div><b>تعذّر قراءة بيانات السحابة.</b><div class="small">هذه نسخة محلية للعرض فقط. لا يمكن تعديل البيانات قبل إعادة الاتصال. يمكنك تنزيل نسخة JSON للحفظ.</div></div>
     <button class="btn btn-soft" onclick="App.exportBackup()">حفظ نسخة JSON</button>
@@ -1091,9 +1094,11 @@ function pageBatchDetail(){
         `<button class="btn btn-soft" onclick="App.startBatchTimer('${b.id}')">${icon("clock",14)} بدء المؤقت</button>`}
     </div>
     ${b.timerStartedAt?`<p class="small muted">بدأ الساعة: ${new Date(b.timerStartedAt).toLocaleString("ar")}</p>`:""}
+    ${Studio.delivery(b)}
     ${projectLink?`<a class="btn btn-soft small" href="${esc(projectLink)}" target="_blank" rel="noopener noreferrer" style="margin-top:12px">${icon("link",14)} فتح ملفات المشروع</a>`:""}
     ${b.notes?`<p class="small muted" style="margin:12px 0 0">${esc(b.notes)}</p>`:""}
   </div>
+  ${Studio.earnings(b)}
   <h2 class="small bold muted" style="margin-bottom:10px;">قائمة الأعمال</h2>
   ${(b.items||[]).length===0? emptyState("clipboard","لا يوجد أعمال مضافة بعد. اضغط + بالأسفل لإضافة أول عمل.") :
   b.items.map((it,idx)=>{
@@ -1251,6 +1256,7 @@ function pageExpenses(){
     ${statCard("wallet","إجمالي المصاريف","$"+fmt(total),"var(--roseBg)","var(--rose)")}
     ${EXPENSE_CATEGORIES.slice(0,3).map(cat=>statCard("dollar",cat,"$"+fmt(byCat[cat]||0),"var(--panel2)","var(--muted)")).join("")}
   </div>
+  ${Studio.renewals()}
   ${list.length===0? emptyState("wallet","لا يوجد مصاريف مسجلة بعد.","مصروف جديد","App.openExpenseModal()") :
   list.map(e=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div class="expense-service-row">${expenseServiceIcon(expenseService(e.serviceName ?? e.name))}<div><div class="bold small">${esc(e.name)} <span class="badge badge-grey">${esc(e.category)}</span></div><div class="muted small">${esc(e.date)} ${e.notes?(" · "+esc(e.notes)):""}</div></div></div>
@@ -1430,6 +1436,7 @@ function pageSettings(){
       <div class="field"><label class="lbl">اسم نشاطك / اسمك</label><input value="${esc(s.businessName)}" oninput="App.setSetting('businessName', this.value)"></div>
       <div class="field"><label class="lbl">بيانات التواصل</label><input value="${esc(s.businessContact)}" oninput="App.setSetting('businessContact', this.value)"></div>
     </div>
+    <div class="field"><label class="lbl">مجلد التصاميم الرئيسي على Drive</label><input type="url" value="${esc(s.deliveryFolder||'')}" onchange="App.setSetting('deliveryFolder',this.value)"></div>
     <div class="field"><label class="lbl">ملاحظة الدفع</label><textarea rows="2" oninput="App.setSetting('paymentNote', this.value)">${esc(s.paymentNote)}</textarea></div>
   </div>
   <div class="card" style="margin-bottom:18px;">
@@ -1489,7 +1496,7 @@ function modalBatchMeta(){
       <div class="field"><label class="lbl">تاريخ النهاية</label><input type="date" value="${b.endDate||''}" oninput="App.modalUpdateSilent('endDate', this.value)"></div>
     </div>
     <div class="field"><label class="lbl">الحالة</label><div><button class="chip ${b.status==='مفتوح'?'active':''}" onclick="App.modalUpdate('status','مفتوح')">مفتوح</button><button class="chip ${b.status==='منتهي'?'active':''}" onclick="App.modalUpdate('status','منتهي')">منتهي</button></div></div>
-    <div class="field"><label class="lbl">رابط ملفات المشروع (Google Drive أو غيره)</label><input type="url" placeholder="https://..." value="${esc(b.driveLink||"")}" oninput="App.modalUpdateSilent('driveLink',this.value)"></div>
+    <div class="field"><label class="lbl">رابط تسليم هذا العميل (مجلد المشروع فقط)</label><input type="url" placeholder="https://..." value="${esc(b.driveLink||"")}" oninput="App.modalUpdateSilent('driveLink',this.value)"></div>
     <div class="field"><label class="lbl">تكلفة ساعة العمل بالدولار (اختياري)</label><input type="number" inputmode="decimal" step="0.5" min="0" value="${Number(b.hourlyRate||0)}" oninput="App.modalUpdateSilent('hourlyRate',this.value,true)"></div>
     <div class="field"><label class="lbl">ملاحظات المشروع</label><textarea rows="2" oninput="App.modalUpdateSilent('notes',this.value)">${esc(b.notes||"")}</textarea></div>
     <button class="btn btn-primary" style="width:100%;padding:13px;justify-content:center;" onclick="App.saveBatchMeta()">حفظ</button>
@@ -1528,6 +1535,7 @@ function modalItem(){
         <div class="field" style="margin-top:10px;"><label class="lbl">القيمة الحقيقية التقديرية الإجمالية لهذا العمل $</label><input type="number" inputmode="decimal" value="${it.realValue}" oninput="App.modalUpdateSilent('realValue', this.value, true)"></div>
       </div>
     `}
+    ${Studio.teamFields(it)}
     <p class="small ${diff>=0?'diff-pos':'diff-neg'}" id="itemSummaryLine">${itemSummaryText(it)}</p>
     <div class="field"><label class="lbl">التاريخ</label><input type="date" value="${it.date||''}" oninput="App.modalUpdateSilent('date', this.value)"></div>
     ${!detailed? `<button class="btn ${it.paid?'btn-success':'btn-soft'}" style="width:100%;margin-bottom:10px;justify-content:center;" onclick="App.modalUpdate('paid', !it.paid)">${it.paid?icon('check',14)+' مدفوع':'غير مدفوع — اضغط للتأكيد'}</button>`:""}
@@ -1695,6 +1703,7 @@ function modalExpense(){
         </select>
       </div>
     </div>` : ""}
+    ${Studio.expenseFields(e)}
     <div class="field"><label class="lbl">اسم المصروف</label><input id="expenseName" value="${esc(e.name)}" oninput="App.modalUpdateSilent('name', this.value)"></div>
     <div class="grid g2">
       <div class="field"><label class="lbl">القيمة $</label><input type="number" inputmode="decimal" value="${e.amount}" oninput="App.modalUpdateSilent('amount', this.value, true)"></div>
@@ -2054,7 +2063,9 @@ const App = {
   compTogglePaid(cid){ const c=ST.modal.data.components.find(x=>x.id===cid); if(c){ c.paid=!c.paid; renderModal(); } },
   saveItem(){
     const d = ST.modal.data; const batchId = d._batchId;
-    const clean = {id:d.id, title:d.title, type:d.type, customType:d.customType, pricingMode:d.pricingMode||"simple",
+    const designer=String(d.designer||"").trim();
+    if(designer && (d.commission==null || String(d.commission).trim()==="" || !Number.isFinite(Number(d.commission)) || Number(d.commission)<0 || Number(d.commission)>100))return alert("أدخل نسبتك بين 0 و100.");
+    const clean = {designer,commission:designer?Number(d.commission):0,stage:d.stage||"قيد التنفيذ",taskDue:d.taskDue||"",id:d.id, title:d.title, type:d.type, customType:d.customType, pricingMode:d.pricingMode||"simple",
       components:(d.components||[]).map(c=>({id:c.id,name:c.name,qty:Number(c.qty||0),price:Number(c.price||0),status:c.status||"لم يبدأ",paid:!!c.paid})),
       qty:Number(d.qty||1), price:Number(d.price||0), realValue:Number(d.realValue||0), date:d.date, paid:!!d.paid};
     const b = DB.batches.find(x=>x.id===batchId);
@@ -2085,7 +2096,12 @@ const App = {
     if(value === "custom") document.getElementById("expenseName")?.select();
   },
   openExpenseModal(id){ let data; if(id) data=Object.assign({}, DB.expenses.find(e=>e.id===id)); else data={id:uid(), name:"", category:EXPENSE_CATEGORIES[0], amount:0, date:todayStr(), notes:""}; ST.modal={type:"expense", data}; renderModal(); },
-  saveExpense(){ const d=ST.modal.data; if(!d.name.trim()) return alert("الرجاء كتابة اسم المصروف"); const clean={...d, amount:Number(d.amount||0)}; const idx=DB.expenses.findIndex(e=>e.id===clean.id); if(idx>=0) DB.expenses[idx]=clean; else DB.expenses.push(clean); saveDB(); App.closeModal(); render(); },
+  saveExpense(){ const d=ST.modal.data; if(!d.name.trim()) return alert("الرجاء كتابة اسم المصروف"); if(d.category==="اشتراكات"&&d.cycle&&!d.nextDue)return alert("حدّد موعد التجديد القادم");
+    if(d.category==="اشتراكات"&&d.cycle&&Number(d.amount)<=0)return alert("أدخل قيمة الاشتراك المدفوع");
+    const previous=DB.expenses.find(x=>x.id===d.id);
+    const clean={...d, amount:Number(d.amount||0)};
+    if(d.category!=="اشتراكات"||!d.cycle){delete clean.nextDue;delete clean.cycle;delete clean.anchorDay;}
+    else if(previous?.nextDue!==d.nextDue)clean.anchorDay=Number(d.nextDue.slice(-2)); const idx=DB.expenses.findIndex(e=>e.id===clean.id); if(idx>=0) DB.expenses[idx]=clean; else DB.expenses.push(clean); saveDB(); App.closeModal(); render(); },
   deleteExpense(id){ if(!confirm("حذف هذا المصروف؟")) return; DB.expenses=DB.expenses.filter(e=>e.id!==id); saveDB(); render(); },
 
   // WAITLIST
@@ -2144,8 +2160,8 @@ const App = {
     const b = DB.batches.find(x=>x.id===bid); if(!b) return;
     const items=[];
     (b.items||[]).forEach((it,idx)=>{
-      if(it.pricingMode==="detailed"){ (it.components||[]).forEach(c=>items.push({id:uid(), desc:`${it.title||it.type} - ${c.name}`, qty:Number(c.qty||1), price:Number(c.price||0)})); }
-      else items.push({id:uid(), desc:`${idx+1}. ${it.title||(it.type==='أخرى'?it.customType:it.type)}`, qty:Number(it.qty||1), price:Number(it.price||0)});
+      if(it.pricingMode==="detailed"){ (it.components||[]).forEach(c=>items.push({id:uid(),sourceBatch:b.id,sourcePart:c.id, desc:`${it.title||it.type} - ${c.name}`, qty:Number(c.qty||1), price:Number(c.price||0)})); }
+      else items.push({id:uid(),sourceBatch:b.id,sourcePart:it.id, desc:`${idx+1}. ${it.title||(it.type==='أخرى'?it.customType:it.type)}`, qty:Number(it.qty||1), price:Number(it.price||0)});
     });
     App.openInvoiceModal(null, {clientId:b.clientId, clientName:clientName(b.clientId), clientEmail:clientContact(b.clientId), items: items.length?items:[{id:uid(),desc:"",qty:1,price:0}], notes:DB.settings.paymentNote});
   },
@@ -2160,8 +2176,8 @@ const App = {
     if(!inv.clientId){ inv.clientId=b.clientId; inv.clientName=clientName(b.clientId); inv.clientEmail=clientContact(b.clientId); }
     const newItems=[];
     (b.items||[]).forEach((it,idx)=>{
-      if(it.pricingMode==="detailed"){ (it.components||[]).forEach(c=>newItems.push({id:uid(), desc:`${it.title||it.type} - ${c.name}`, qty:Number(c.qty||1), price:Number(c.price||0)})); }
-      else newItems.push({id:uid(), desc:`${idx+1}. ${it.title||(it.type==='أخرى'?it.customType:it.type)}`, qty:Number(it.qty||1), price:Number(it.price||0)});
+      if(it.pricingMode==="detailed"){ (it.components||[]).forEach(c=>newItems.push({id:uid(),sourceBatch:b.id,sourcePart:c.id, desc:`${it.title||it.type} - ${c.name}`, qty:Number(c.qty||1), price:Number(c.price||0)})); }
+      else newItems.push({id:uid(),sourceBatch:b.id,sourcePart:it.id, desc:`${idx+1}. ${it.title||(it.type==='أخرى'?it.customType:it.type)}`, qty:Number(it.qty||1), price:Number(it.price||0)});
     });
     inv.items = [...inv.items.filter(it=>it.desc), ...newItems];
     if(inv.items.length===0) inv.items=[{id:uid(),desc:"",qty:1,price:0}];
